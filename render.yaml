@@ -29,6 +29,8 @@ services:
         value: twilio
       - key: TTS_PROVIDER
         value: twilio           # später "elevenlabs" für natürliche Stimme
+      - key: STT_PROVIDER
+        value: elevenlabs       # Echtzeit-STT über ElevenLabs (kein Deepgram nötig)
       - key: ANTHROPIC_MODEL
         value: claude-opus-4-8
       - key: AGENT_LANGUAGE
@@ -61,9 +63,11 @@ services:
         sync: false
 
       # --- Optional (nur falls genutzt) -------------------------------
+      # Für ElevenLabs-Stimme UND Echtzeit-STT genügt EIN ElevenLabs-Account:
       - key: ELEVENLABS_API_KEY
         sync: false
       - key: ELEVENLABS_VOICE_ID
         sync: false
+      # Nur falls STT_PROVIDER=deepgram statt elevenlabs:
       - key: DEEPGRAM_API_KEY
         sync: false

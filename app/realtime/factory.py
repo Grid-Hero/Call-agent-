@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from app.config import Settings
 from app.realtime.call_control import CallControl, TwilioCallControl
-from app.realtime.stt import DeepgramSTT, StreamingSTT
+from app.realtime.stt import DeepgramSTT, ElevenLabsSTT, StreamingSTT
 from app.realtime.tts_stream import ElevenLabsStreamingTTS, StreamingTTS
 
 
 def build_stt(settings: Settings) -> StreamingSTT:
-    provider = (settings.stt_provider or "deepgram").lower()
+    provider = (settings.stt_provider or "elevenlabs").lower()
+    if provider == "elevenlabs":
+        return ElevenLabsSTT(settings)
     if provider == "deepgram":
         return DeepgramSTT(settings)
     raise RuntimeError(f"Unbekannter STT_PROVIDER: {settings.stt_provider}")

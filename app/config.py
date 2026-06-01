@@ -48,10 +48,21 @@ class Settings(BaseSettings):
     elevenlabs_output_format: str = "mp3_44100_128"
 
     # Speech-to-Text (nur im Echtzeit-Modus)
-    stt_provider: str = "deepgram"
+    # "elevenlabs" -> ein Account für STT + TTS (kein Extra-Dienst nötig)
+    # "deepgram"   -> Alternative
+    stt_provider: str = "elevenlabs"
+    # ElevenLabs Scribe (Realtime-STT). Werte ggf. an die ElevenLabs-Doku anpassen.
+    elevenlabs_stt_model: str = "scribe_v2_realtime"
+    elevenlabs_stt_encoding: str = "ulaw"  # Twilio μ-law; Sample-Rate 8000
+    # Deepgram (optional, nur falls STT_PROVIDER=deepgram)
     deepgram_api_key: str = ""
     deepgram_model: str = "nova-2"
     deepgram_language: str = "de"
+
+    @property
+    def stt_language(self) -> str:
+        """STT-Sprachcode aus AGENT_LANGUAGE (z.B. 'de-DE' -> 'de')."""
+        return self.agent_language.split("-")[0]
 
     # E-Mail
     smtp_host: str = ""

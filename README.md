@@ -176,26 +176,32 @@ Anrufer ⇄ Twilio Media Stream (WebSocket, μ-law 8 kHz)
               │  bidirektional
    ┌──────────┴───────────┐
    ▼                      ▲
-Deepgram STT          ElevenLabs TTS (Streaming, μ-law)
-(Streaming, de)           ▲
+ElevenLabs STT        ElevenLabs TTS (Streaming, μ-law)
+(Scribe Realtime)         ▲
    │ Transkript           │ Antworttext
    ▼                      │
         Claude (decide) ──┘
    + Barge-in: Anrufer kann den Agent jederzeit unterbrechen
 ```
 
-Aktivieren über `CONVERSATION_MODE=realtime` (zusätzlich zu ElevenLabs-Keys):
+Aktivieren über `CONVERSATION_MODE=realtime`. **STT und TTS laufen über
+denselben ElevenLabs-Account** – kein separater Spracherkennungs-Dienst nötig:
 
 ```bash
 CONVERSATION_MODE=realtime
-DEEPGRAM_API_KEY=...        # Streaming-Spracherkennung (Deutsch)
-ELEVENLABS_API_KEY=...      # Stimme (streamt μ-law direkt)
+STT_PROVIDER=elevenlabs     # Verstehen (Scribe Realtime)
+TTS_PROVIDER=elevenlabs     # Sprechen
+ELEVENLABS_API_KEY=...      # ein Key für beides
 ELEVENLABS_VOICE_ID=...
 ```
 
+> Alternativ ist `STT_PROVIDER=deepgram` möglich (eigener Account, `DEEPGRAM_API_KEY`).
+
 **Eigenschaften:**
-- **Kein Audio-Transcoding** – Deepgram nimmt μ-law 8 kHz entgegen, ElevenLabs
-  liefert μ-law 8 kHz aus; beides Twilios natives Format.
+- **Ein Anbieter für STT + TTS** – ElevenLabs übernimmt Verstehen (Scribe
+  Realtime) und Sprechen; nur ein Account/Key nötig. Deepgram bleibt optional.
+- **Kein Audio-Transcoding** – beide Richtungen nutzen μ-law 8 kHz, Twilios
+  natives Format.
 - **Barge-in** – spricht der Anrufer, während der Agent redet, wird die
   Wiedergabe per `clear` sofort gestoppt.
 - **Weiterleiten** – im Media Stream nicht via `<Dial>` möglich; der Anruf wird
