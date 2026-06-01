@@ -10,7 +10,7 @@ services:
   - type: web
     name: call-agent
     runtime: python
-    plan: starter        # "free" zum Testen möglich (schläft bei Inaktivität ein)
+    plan: free           # kostenlos; schläft bei Inaktivität ein (für echten Betrieb -> "starter")
     region: frankfurt    # EU-Region (näher an Telekom/DSGVO)
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
