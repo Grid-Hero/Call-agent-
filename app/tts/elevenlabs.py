@@ -20,7 +20,7 @@ class ElevenLabsTTS(TTSProvider):
     def __init__(self, settings: Settings, store: AudioStore):
         self.settings = settings
         self.store = store
-        self.base_url = settings.app_base_url.rstrip("/")
+        self.base_url = settings.effective_base_url
 
     async def synthesize(self, text: str, language: str) -> Optional[str]:
         if not text or not text.strip():

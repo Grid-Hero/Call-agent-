@@ -70,9 +70,24 @@ class Settings(BaseSettings):
         return self.app_env.lower() == "production"
 
     @property
+    def effective_base_url(self) -> str:
+        """Öffentliche Basis-URL der App.
+
+        Bevorzugt APP_BASE_URL; fällt sonst auf RENDER_EXTERNAL_URL zurück, das
+        Render-Hosting automatisch bereitstellt. So muss die URL nach dem ersten
+        Deploy nicht manuell nachgetragen werden.
+        """
+        import os
+
+        if self.app_base_url and "localhost" not in self.app_base_url:
+            return self.app_base_url.rstrip("/")
+        render_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+        return (render_url or self.app_base_url).rstrip("/")
+
+    @property
     def websocket_base_url(self) -> str:
-        """Leitet die WebSocket-Basis-URL aus APP_BASE_URL ab (http->ws, https->wss)."""
-        base = self.app_base_url.rstrip("/")
+        """Leitet die WebSocket-Basis-URL aus der Basis-URL ab (http->ws, https->wss)."""
+        base = self.effective_base_url
         if base.startswith("https://"):
             return "wss://" + base[len("https://") :]
         if base.startswith("http://"):

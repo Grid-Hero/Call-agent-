@@ -13,6 +13,9 @@ Telefonie ist über eine **austauschbare Adapter-Schicht** angebunden
 
 > 🚀 **Neu hier?** Die komplette Einrichtung von „Keys besorgen" bis zum ersten
 > Testanruf steht in **[docs/SETUP.md](docs/SETUP.md)**.
+>
+> ☁️ **Online betreiben?** Deployment auf Render (aus dem GitHub-Repo, mit
+> sicherer Key-Eingabe) steht in **[docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md)**.
 
 ---
 

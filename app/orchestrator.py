@@ -61,7 +61,7 @@ class Orchestrator:
 
     # --- URLs für Webhook-Callbacks -----------------------------------------
     def _url(self, path: str) -> str:
-        return f"{self.settings.app_base_url.rstrip('/')}{path}"
+        return f"{self.settings.effective_base_url}{path}"
 
     async def _voice(self, text: str) -> Optional[str]:
         """Synthetisiert den Text via TTS-Anbieter; None => Anbieter-Stimme."""

@@ -1,0 +1,69 @@
+# ============================================================
+#  Render Blueprint für den Call-Agent
+#  Render liest diese Datei automatisch und richtet den Dienst ein.
+#  Die geheimen Werte (sync: false) trägst du im Render-Dashboard ein –
+#  sie landen NIE im Git-Repo.
+#  Doku: https://render.com/docs/blueprint-spec
+# ============================================================
+
+services:
+  - type: web
+    name: call-agent
+    runtime: python
+    plan: starter        # "free" zum Testen möglich (schläft bei Inaktivität ein)
+    region: frankfurt    # EU-Region (näher an Telekom/DSGVO)
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true     # Bei jedem Git-Push automatisch neu deployen
+
+    envVars:
+      # --- Nicht geheime Konfiguration (Werte hier ok) -----------------
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: APP_ENV
+        value: production
+      - key: CONVERSATION_MODE
+        value: gather           # später "realtime" für Echtzeit-Audio
+      - key: TELEPHONY_PROVIDER
+        value: twilio
+      - key: TTS_PROVIDER
+        value: twilio           # später "elevenlabs" für natürliche Stimme
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-8
+      - key: AGENT_LANGUAGE
+        value: de-DE
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USE_TLS
+        value: "true"
+      # APP_BASE_URL wird automatisch aus RENDER_EXTERNAL_URL erkannt –
+      # du musst sie nicht setzen.
+
+      # --- Geheim: im Render-Dashboard eintragen (bleiben privat) ------
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_FALLBACK_TO
+        sync: false
+
+      # --- Optional (nur falls genutzt) -------------------------------
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
