@@ -1,0 +1,64 @@
+# ============================================================
+#  Mitarbeiter- und Abteilungsverzeichnis
+#  Der Call-Agent ordnet Anliegen anhand der "topics" einer
+#  Abteilung zu und entscheidet, ob durchgestellt (transfer)
+#  oder eine Zusammenfassung per E-Mail gesendet wird.
+# ============================================================
+
+company:
+  name: "Musterfirma GmbH"
+  # Begrüßung, die der Agent zu Gesprächsbeginn sagt.
+  greeting: >
+    Guten Tag, Sie sind mit dem digitalen Assistenten der Musterfirma verbunden.
+    Wie kann ich Ihnen helfen?
+  # Geschäftszeiten (24h, lokale Zeit). Außerhalb -> nur Nachricht aufnehmen.
+  business_hours:
+    timezone: "Europe/Berlin"
+    monday:    ["08:00", "17:00"]
+    tuesday:   ["08:00", "17:00"]
+    wednesday: ["08:00", "17:00"]
+    thursday:  ["08:00", "17:00"]
+    friday:    ["08:00", "15:00"]
+    saturday:  []
+    sunday:    []
+
+departments:
+  - id: vertrieb
+    name: "Vertrieb"
+    # Stichworte/Beschreibung, die Claude für die Zuordnung nutzt.
+    topics:
+      - "Angebot, Preise, Kauf, Neukunde, Produktinteresse, Bestellung"
+    email: "vertrieb@example.com"
+    phone: "+49301111111"        # Zielnummer für Weiterleitung
+    transfer_enabled: true        # Darf direkt durchgestellt werden?
+
+  - id: support
+    name: "Technischer Support"
+    topics:
+      - "Störung, Problem, Fehler, technische Frage, Reklamation, defekt"
+    email: "support@example.com"
+    phone: "+49302222222"
+    transfer_enabled: true
+
+  - id: buchhaltung
+    name: "Buchhaltung"
+    topics:
+      - "Rechnung, Zahlung, Mahnung, Gutschrift, Buchhaltung, Steuer"
+    email: "buchhaltung@example.com"
+    phone: "+49303333333"
+    transfer_enabled: false       # Nur Nachricht aufnehmen, nicht durchstellen
+
+  - id: personal
+    name: "Personalabteilung"
+    topics:
+      - "Bewerbung, Job, Stelle, Praktikum, Personal, HR"
+    email: "hr@example.com"
+    phone: "+49304444444"
+    transfer_enabled: false
+
+# Fallback, wenn keine Abteilung eindeutig passt.
+fallback:
+  department_name: "Zentrale"
+  email: "zentrale@example.com"
+  phone: "+49300000000"
+  transfer_enabled: false

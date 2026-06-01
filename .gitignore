@@ -1,0 +1,23 @@
+# Geheimnisse / Konfiguration
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Logs & Daten
+*.log
+data/
+recordings/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store

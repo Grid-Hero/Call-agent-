@@ -1,0 +1,25 @@
+# Web-Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Telefonie
+twilio==9.4.1
+
+# KI
+anthropic==0.42.0
+
+# Konfiguration & Validierung
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+PyYAML==6.0.2
+
+# E-Mail (asynchron)
+aiosmtplib==3.0.2
+Jinja2==3.1.5
+
+# Tests
+pytest==8.3.4
+pytest-asyncio==0.25.2
+httpx==0.28.1
