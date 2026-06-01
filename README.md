@@ -1,5 +1,11 @@
 # Call-Agent 📞🤖
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Grid-Hero/Call-agent-)
+
+> Ein-Klick-Deployment: Button anklicken → Render liest `render.yaml`, richtet
+> alles automatisch ein und fragt nur noch deine API-Keys ab. Anleitung:
+> **[docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md)**.
+
 Ein KI-gestützter Telefonassistent, der eingehende Anrufe **automatisch
 annimmt**, das Anliegen versteht und entweder
 

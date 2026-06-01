@@ -16,6 +16,16 @@ Render-Dashboard** ein – sicher, nicht im Code, nicht im Chat.
 
 ---
 
+## Schnellster Weg: „Deploy to Render"-Button
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Grid-Hero/Call-agent-)
+
+Button anklicken → mit GitHub anmelden → Render liest `render.yaml` automatisch
+und fragt direkt nach deinen Keys (Schritt 3). Fertig. Wer es lieber manuell
+macht, folgt den Schritten 1–2.
+
+---
+
 ## Schritt 1 – Render-Konto anlegen
 1. Gehe auf **https://render.com** → **„Get Started"**.
 2. Mit **GitHub** anmelden (dann kann Render dein Repo lesen).
