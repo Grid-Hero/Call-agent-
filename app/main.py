@@ -50,8 +50,12 @@ async def _validate_twilio(request: Request, form: dict) -> bool:
     if not isinstance(adapter, TwilioAdapter):
         return True
     signature = request.headers.get("X-Twilio-Signature", "")
-    # Twilio signiert die öffentliche URL; respektiere Proxy-Header.
-    url = str(request.url)
+    # Hinter einem Reverse-Proxy (z.B. Render) zeigt request.url oft die interne
+    # URL (http/anderer Host). Twilio signiert aber die ÖFFENTLICHE URL, daher
+    # rekonstruieren wir sie aus der bekannten Basis-URL + Pfad.
+    url = f"{settings.effective_base_url}{request.url.path}"
+    if request.url.query:
+        url = f"{url}?{request.url.query}"
     return adapter.validate_signature(url, form, signature)
 
 
