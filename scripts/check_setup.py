@@ -100,7 +100,7 @@ def check_smtp(s) -> bool:
 
 
 def check_elevenlabs(s) -> bool:
-    print("ElevenLabs (Stimme)")
+    print("ElevenLabs (Stimme/STT)")
     if not s.elevenlabs_api_key:
         return _fail("ELEVENLABS_API_KEY", "fehlt, aber TTS_PROVIDER=elevenlabs")
     try:
@@ -150,6 +150,11 @@ def check_deepgram(s) -> bool:
         return _fail("Deepgram", str(exc)[:120])
 
 
+def should_check_deepgram(s) -> bool:
+    """Deepgram wird nur benötigt, wenn es als STT-Anbieter gewählt wurde."""
+    return s.conversation_mode == "realtime" and (s.stt_provider or "").lower() == "deepgram"
+
+
 def main() -> int:
     s = get_settings()
     print("=" * 50)
@@ -162,9 +167,12 @@ def main() -> int:
     if s.tts_provider == "elevenlabs" or s.conversation_mode == "realtime":
         print()
         results.append(check_elevenlabs(s))
-    if s.conversation_mode == "realtime":
+    if should_check_deepgram(s):
         print()
         results.append(check_deepgram(s))
+    elif s.conversation_mode == "realtime":
+        print()
+        _skip("Deepgram", f"nicht genutzt (STT_PROVIDER={s.stt_provider})")
 
     print("\n" + "=" * 50)
     if all(results):
