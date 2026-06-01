@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # Gesprächsmodus
     # "gather"   -> Turn-by-turn (Twilio <Gather>/<Say>), einfach & robust
-    # "realtime" -> Echtzeit-Audio via Twilio Media Streams (Deepgram + ElevenLabs)
+    # "realtime" -> Echtzeit-Audio via Twilio Media Streams (ElevenLabs, optional Deepgram)
     conversation_mode: str = "gather"
 
     # Telefonie
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # Anthropic / Claude
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-opus-4-8"
+    anthropic_model: str = "claude-sonnet-4-20250514"
     agent_language: str = "de-DE"
     agent_company_name: str = "Musterfirma GmbH"
 
