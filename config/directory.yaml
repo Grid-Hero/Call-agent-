@@ -6,11 +6,11 @@
 # ============================================================
 
 company:
-  name: "Musterfirma GmbH"
+  name: "Planet in Green"
   # Begrüßung, die der Agent zu Gesprächsbeginn sagt.
   greeting: >
-    Guten Tag, Sie sind mit dem digitalen Assistenten der Musterfirma verbunden.
-    Wie kann ich Ihnen helfen?
+    Guten Tag, Sie sind mit dem digitalen Assistenten von Planet in Green
+    verbunden. Wie kann ich Ihnen helfen?
   # Geschäftszeiten (24h, lokale Zeit). Außerhalb -> nur Nachricht aufnehmen.
   business_hours:
     timezone: "Europe/Berlin"
