@@ -39,16 +39,16 @@ class AsteriskAdapter(TelephonyAdapter):
             "(Abschnitt 'Weg B: Telekom-PBX via Asterisk') für die Umsetzung."
         )
 
-    def greeting_response(self, greeting_text, gather_action_url, language):  # noqa: D102
+    def greeting_response(self, greeting_text, gather_action_url, language, audio_url=None):  # noqa: D102
         return self._not_implemented()
 
-    def continue_response(self, reply_text, gather_action_url, language):  # noqa: D102
+    def continue_response(self, reply_text, gather_action_url, language, audio_url=None):  # noqa: D102
         return self._not_implemented()
 
-    def transfer_response(self, reply_text, target_number, language, status_callback_url):  # noqa: D102
+    def transfer_response(self, reply_text, target_number, language, status_callback_url, audio_url=None):  # noqa: D102
         return self._not_implemented()
 
-    def hangup_response(self, reply_text, language):  # noqa: D102
+    def hangup_response(self, reply_text, language, audio_url=None):  # noqa: D102
         return self._not_implemented()
 
     def parse_incoming(self, form):  # noqa: D102

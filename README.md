@@ -17,6 +17,7 @@ Telefonie ist über eine **austauschbare Adapter-Schicht** angebunden
 - [Funktionsweise](#funktionsweise)
 - [Architektur](#architektur)
 - [Telekom-PBX anbinden](#telekom-pbx-anbinden)
+- [Stimme (ElevenLabs)](#stimme-elevenlabs)
 - [Schnellstart](#schnellstart)
 - [Konfiguration](#konfiguration)
 - [Mitarbeiterverzeichnis](#mitarbeiterverzeichnis-anpassen)
@@ -68,6 +69,7 @@ Außerhalb der Geschäftszeiten (in `config/directory.yaml` definiert) wird
 | `app/telephony/base.py`        | Abstrakte Telefonie-Schnittstelle                        |
 | `app/telephony/twilio_adapter.py` | Twilio-Implementierung (TwiML, Signaturprüfung)       |
 | `app/telephony/asterisk_adapter.py` | Gerüst für Telekom-PBX via Asterisk                 |
+| `app/tts/`                     | Stimme: Anbieter-Abstraktion, ElevenLabs, Audio-Store    |
 | `app/notify/email.py`          | E-Mail-Versand der Zusammenfassung (SMTP)                |
 | `app/directory.py`             | Mitarbeiter-/Abteilungsverzeichnis, Geschäftszeiten      |
 | `app/models.py`                | Domänenmodelle (Session, Entscheidung, Zusammenfassung)  |
@@ -114,6 +116,41 @@ Die Geschäftslogik (`app/ai`, `app/notify`, `app/orchestrator`) wird dabei
 
 ---
 
+## Stimme (ElevenLabs)
+
+Die Stimme des Agents ist über einen **austauschbaren TTS-Anbieter** umschaltbar:
+
+| `TTS_PROVIDER` | Verhalten                                                          |
+|----------------|--------------------------------------------------------------------|
+| `twilio`       | Eingebaute Twilio-Stimme (`<Say>`) – kostenlos, kein Setup         |
+| `elevenlabs`   | Natürliche **ElevenLabs**-Stimme (`<Play>` mit synthetisiertem MP3)|
+
+So funktioniert der ElevenLabs-Pfad:
+
+1. Der Antworttext des Agents wird per ElevenLabs-API zu einem MP3 synthetisiert.
+2. Das Audio landet kurzlebig im `AudioStore` und wird unter
+   `…/audio/{token}.mp3` ausgeliefert.
+3. Das TwiML nutzt `<Play>` statt `<Say>`, Twilio ruft die Audio-URL ab.
+
+**Einrichtung** (in `.env`):
+
+```bash
+TTS_PROVIDER=elevenlabs
+ELEVENLABS_API_KEY=...            # aus deinem ElevenLabs-Konto
+ELEVENLABS_VOICE_ID=...           # gewünschte Stimme (Voice-ID)
+ELEVENLABS_MODEL=eleven_multilingual_v2   # unterstützt Deutsch
+```
+
+> **Robust by design:** Schlägt ElevenLabs aus (Timeout, fehlender Key), fällt
+> der Agent automatisch auf die Twilio-Stimme zurück – der Anruf bricht nie ab.
+> `APP_BASE_URL` muss öffentlich erreichbar sein, da Twilio die Audio-URL abruft.
+
+> **Hinweis Latenz:** Pro Antwort entsteht ein zusätzlicher API-Aufruf. Für
+> geringere Latenz `eleven_turbo_v2_5` als Modell wählen. Für echte Echtzeit-
+> Dialoge siehe Roadmap (Media Streams).
+
+---
+
 ## Schnellstart
 
 ```bash
@@ -155,6 +192,8 @@ Wichtigste Werte:
 | `TWILIO_VALIDATE_SIGNATURE` | Webhook-Signaturprüfung (in Produktion `true`)    |
 | `ANTHROPIC_API_KEY`       | Claude-API-Schlüssel                                |
 | `ANTHROPIC_MODEL`         | Claude-Modell (Standard: `claude-opus-4-8`)         |
+| `TTS_PROVIDER`            | Stimme: `twilio` oder `elevenlabs`                  |
+| `ELEVENLABS_*`            | ElevenLabs-Key, Voice-ID, Modell (bei `elevenlabs`) |
 | `SMTP_*`, `EMAIL_*`       | E-Mail-Versand der Zusammenfassungen                |
 | `DIRECTORY_PATH`          | Pfad zur Verzeichnis-YAML                           |
 

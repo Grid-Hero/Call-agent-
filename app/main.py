@@ -12,6 +12,8 @@ from app.config import get_settings
 from app.directory import get_directory
 from app.orchestrator import Orchestrator, SessionStore
 from app.telephony.twilio_adapter import TwilioAdapter
+from app.tts.factory import build_tts
+from app.tts.store import AudioStore
 
 settings = get_settings()
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
@@ -32,7 +34,9 @@ elif settings.telephony_provider == "asterisk":
 else:  # pragma: no cover
     raise RuntimeError(f"Unbekannter TELEPHONY_PROVIDER: {settings.telephony_provider}")
 
-orchestrator = Orchestrator(settings, directory, adapter, agent, SessionStore())
+audio_store = AudioStore()
+tts = build_tts(settings, audio_store)
+orchestrator = Orchestrator(settings, directory, adapter, agent, SessionStore(), tts)
 
 _TWIML_MEDIA = "application/xml"
 
@@ -70,7 +74,7 @@ async def voice_incoming(request: Request) -> Response:
     form = dict(await request.form())
     if not await _validate_twilio(request, form):
         return PlainTextResponse("Ungültige Signatur", status_code=403)
-    return _twiml(orchestrator.handle_incoming(form))
+    return _twiml(await orchestrator.handle_incoming(form))
 
 
 @app.post("/voice/handle")
@@ -80,6 +84,19 @@ async def voice_handle(request: Request) -> Response:
     if not await _validate_twilio(request, form):
         return PlainTextResponse("Ungültige Signatur", status_code=403)
     return _twiml(await orchestrator.handle_speech(form))
+
+
+@app.get("/audio/{token}.mp3")
+async def serve_audio(token: str) -> Response:
+    """Liefert vom TTS-Anbieter (z.B. ElevenLabs) erzeugtes Audio aus.
+
+    Twilio ruft diese URL über <Play> ab. Tokens sind zufällig und kurzlebig.
+    """
+    item = audio_store.get(token)
+    if item is None:
+        return PlainTextResponse("Nicht gefunden oder abgelaufen", status_code=404)
+    data, content_type = item
+    return Response(content=data, media_type=content_type)
 
 
 @app.post("/voice/after-transfer")

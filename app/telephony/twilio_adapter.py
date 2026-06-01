@@ -11,6 +11,8 @@ Telekom-SIP-Trunk auf eine Twilio-Nummer gelegt werden, ohne diesen Code zu
 
 from __future__ import annotations
 
+from typing import Optional
+
 from twilio.request_validator import RequestValidator
 from twilio.twiml.voice_response import Gather, VoiceResponse
 
@@ -47,21 +49,29 @@ class TwilioAdapter(TelephonyAdapter):
         response.append(gather)
         return gather
 
-    def greeting_response(self, greeting_text: str, gather_action_url: str, language: str) -> str:
+    @staticmethod
+    def _speak(container, text: str, language: str, audio_url: Optional[str]) -> None:
+        """Spielt vorab erzeugtes Audio (z.B. ElevenLabs) ab oder spricht via Twilio."""
+        if audio_url:
+            container.play(audio_url)
+        else:
+            container.say(text, language=language)
+
+    def greeting_response(self, greeting_text, gather_action_url, language, audio_url=None):
         response = VoiceResponse()
         gather = self._gather(response, gather_action_url, language)
-        gather.say(greeting_text, language=language)
+        self._speak(gather, greeting_text, language, audio_url)
         return str(response)
 
-    def continue_response(self, reply_text: str, gather_action_url: str, language: str) -> str:
+    def continue_response(self, reply_text, gather_action_url, language, audio_url=None):
         response = VoiceResponse()
         gather = self._gather(response, gather_action_url, language)
-        gather.say(reply_text, language=language)
+        self._speak(gather, reply_text, language, audio_url)
         return str(response)
 
-    def transfer_response(self, reply_text: str, target_number: str, language: str, status_callback_url: str) -> str:
+    def transfer_response(self, reply_text, target_number, language, status_callback_url, audio_url=None):
         response = VoiceResponse()
-        response.say(reply_text, language=language)
+        self._speak(response, reply_text, language, audio_url)
         dial = response.dial(
             timeout=25,
             action=status_callback_url,  # Wird nach dem Telefonat aufgerufen
@@ -71,9 +81,9 @@ class TwilioAdapter(TelephonyAdapter):
         dial.number(target_number)
         return str(response)
 
-    def hangup_response(self, reply_text: str, language: str) -> str:
+    def hangup_response(self, reply_text, language, audio_url=None):
         response = VoiceResponse()
-        response.say(reply_text, language=language)
+        self._speak(response, reply_text, language, audio_url)
         response.hangup()
         return str(response)
 

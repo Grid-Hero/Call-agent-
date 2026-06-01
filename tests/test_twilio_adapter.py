@@ -29,6 +29,15 @@ def test_hangup_twiml(settings):
     assert "Auf Wiederhören!" in xml
 
 
+def test_greeting_uses_play_with_audio_url(settings):
+    adapter = TwilioAdapter(settings)
+    xml = adapter.greeting_response(
+        "Guten Tag!", "https://x/voice/handle", "de-DE", audio_url="https://x/audio/a.mp3"
+    )
+    assert "<Play>https://x/audio/a.mp3</Play>" in xml
+    assert "<Say" not in xml  # ElevenLabs-Audio statt Twilio-Stimme
+
+
 def test_parse_incoming_and_speech(settings):
     adapter = TwilioAdapter(settings)
     form = {"CallSid": "CA1", "From": "+4915112345", "To": "+4930000", "SpeechResult": "Ich brauche Hilfe"}

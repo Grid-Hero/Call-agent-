@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     agent_language: str = "de-DE"
     agent_company_name: str = "Musterfirma GmbH"
 
+    # Text-to-Speech (Stimme des Agents)
+    # "twilio"     -> eingebaute Twilio-Stimme (<Say>)
+    # "elevenlabs" -> ElevenLabs-Stimme (<Play> mit synthetisiertem Audio)
+    tts_provider: str = "twilio"
+    elevenlabs_api_key: str = ""
+    elevenlabs_voice_id: str = ""
+    # Mehrsprachiges Modell (unterstützt Deutsch). Alternativen: eleven_turbo_v2_5 (geringere Latenz)
+    elevenlabs_model: str = "eleven_multilingual_v2"
+    elevenlabs_output_format: str = "mp3_44100_128"
+
     # E-Mail
     smtp_host: str = ""
     smtp_port: int = 587

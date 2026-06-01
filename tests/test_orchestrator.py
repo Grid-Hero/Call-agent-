@@ -41,9 +41,10 @@ def _orchestrator(settings, directory, decision):
     )
 
 
-def test_incoming_creates_session_and_greets(settings, directory):
+@pytest.mark.asyncio
+async def test_incoming_creates_session_and_greets(settings, directory):
     orch = _orchestrator(settings, directory, RoutingDecision(action=Action.CONTINUE, reply_text="..."))
-    xml = orch.handle_incoming({"CallSid": "CA1", "From": "+4915100", "To": "+4930"})
+    xml = await orch.handle_incoming({"CallSid": "CA1", "From": "+4915100", "To": "+4930"})
     assert "<Gather" in xml
     assert orch.store.get("CA1") is not None
 
@@ -52,7 +53,7 @@ def test_incoming_creates_session_and_greets(settings, directory):
 async def test_transfer_flow(settings, directory):
     decision = RoutingDecision(action=Action.TRANSFER, reply_text="Ich verbinde Sie.", department_id="support")
     orch = _orchestrator(settings, directory, decision)
-    orch.handle_incoming({"CallSid": "CA2", "From": "+4915100", "To": "+4930"})
+    await orch.handle_incoming({"CallSid": "CA2", "From": "+4915100", "To": "+4930"})
     xml = await orch.handle_speech({"CallSid": "CA2", "From": "+4915100", "SpeechResult": "Mein Gerät ist defekt"})
     assert "<Dial" in xml
     assert orch.store.get("CA2").transferred is True
@@ -62,7 +63,7 @@ async def test_transfer_flow(settings, directory):
 async def test_message_flow_closes_session(settings, directory):
     decision = RoutingDecision(action=Action.MESSAGE, reply_text="Ich nehme das auf.", department_id="buchhaltung")
     orch = _orchestrator(settings, directory, decision)
-    orch.handle_incoming({"CallSid": "CA3", "From": "+4915100", "To": "+4930"})
+    await orch.handle_incoming({"CallSid": "CA3", "From": "+4915100", "To": "+4930"})
     xml = await orch.handle_speech({"CallSid": "CA3", "From": "+4915100", "SpeechResult": "Frage zur Rechnung"})
     assert "<Hangup" in xml
     # Nach Nachricht wird die Session beendet/entfernt.
@@ -74,7 +75,27 @@ async def test_transfer_disabled_falls_back_to_message(settings, directory):
     # buchhaltung hat transfer_enabled: false -> trotz TRANSFER kein Dial
     decision = RoutingDecision(action=Action.TRANSFER, reply_text="Moment.", department_id="buchhaltung")
     orch = _orchestrator(settings, directory, decision)
-    orch.handle_incoming({"CallSid": "CA4", "From": "+4915100", "To": "+4930"})
+    await orch.handle_incoming({"CallSid": "CA4", "From": "+4915100", "To": "+4930"})
     xml = await orch.handle_speech({"CallSid": "CA4", "From": "+4915100", "SpeechResult": "Rechnungsfrage"})
     assert "<Dial" not in xml
     assert "<Hangup" in xml
+
+
+@pytest.mark.asyncio
+async def test_elevenlabs_audio_played_via_play(settings, directory):
+    """Mit TTS-Anbieter wird <Play> statt <Say> verwendet."""
+    from app.tts.base import TTSProvider
+
+    class FakeTTS(TTSProvider):
+        async def synthesize(self, text, language):
+            return "https://test.example.com/audio/abc.mp3"
+
+    decision = RoutingDecision(action=Action.CONTINUE, reply_text="Können Sie das genauer sagen?")
+    orch = Orchestrator(
+        settings, directory, TwilioAdapter(settings),
+        FakeAgent(settings, directory, decision), SessionStore(), FakeTTS(),
+    )
+    xml = await orch.handle_incoming({"CallSid": "CA5", "From": "+4915100", "To": "+4930"})
+    assert "<Play>" in xml
+    assert "audio/abc.mp3" in xml
+    assert "<Say" not in xml
