@@ -154,6 +154,19 @@ mit **ngrok**:
 
 ## Schritt 6 – Twilio-Nummer mit der App verbinden ✅
 
+### Vorher: Keys prüfen
+
+Bevor du anrufst, prüfe mit dem mitgelieferten Skript, ob alle Zugänge
+funktionieren (zeigt ✅/❌ pro Dienst, **ohne** Key-Werte auszugeben):
+
+```bash
+python scripts/check_setup.py
+```
+
+Erst weitermachen, wenn alle relevanten Punkte ✅ sind.
+
+### Webhook setzen
+
 1. Twilio Console → **Phone Numbers** → **Manage** → deine Nummer anklicken.
 2. Abschnitt **„Voice Configuration"** → **„A call comes in"**:
    - Typ: **Webhook**
