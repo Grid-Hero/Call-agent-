@@ -6,6 +6,9 @@ python-multipart==0.0.20
 # Telefonie
 twilio==9.4.1
 
+# Echtzeit-Audio (WebSocket-Client zu Deepgram)
+websockets==13.1
+
 # KI
 anthropic==0.42.0
 

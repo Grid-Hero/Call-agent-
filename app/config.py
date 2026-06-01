@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
+    # Gesprächsmodus
+    # "gather"   -> Turn-by-turn (Twilio <Gather>/<Say>), einfach & robust
+    # "realtime" -> Echtzeit-Audio via Twilio Media Streams (Deepgram + ElevenLabs)
+    conversation_mode: str = "gather"
+
     # Telefonie
     telephony_provider: str = "twilio"
     twilio_account_sid: str = ""
@@ -42,6 +47,12 @@ class Settings(BaseSettings):
     elevenlabs_model: str = "eleven_multilingual_v2"
     elevenlabs_output_format: str = "mp3_44100_128"
 
+    # Speech-to-Text (nur im Echtzeit-Modus)
+    stt_provider: str = "deepgram"
+    deepgram_api_key: str = ""
+    deepgram_model: str = "nova-2"
+    deepgram_language: str = "de"
+
     # E-Mail
     smtp_host: str = ""
     smtp_port: int = 587
@@ -57,6 +68,16 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def websocket_base_url(self) -> str:
+        """Leitet die WebSocket-Basis-URL aus APP_BASE_URL ab (http->ws, https->wss)."""
+        base = self.app_base_url.rstrip("/")
+        if base.startswith("https://"):
+            return "wss://" + base[len("https://") :]
+        if base.startswith("http://"):
+            return "ws://" + base[len("http://") :]
+        return base
 
 
 @lru_cache

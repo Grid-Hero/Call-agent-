@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Optional
 
 from twilio.request_validator import RequestValidator
-from twilio.twiml.voice_response import Gather, VoiceResponse
+from twilio.twiml.voice_response import Connect, Gather, VoiceResponse
 
 from app.config import Settings
 from app.telephony.base import TelephonyAdapter
@@ -84,6 +84,21 @@ class TwilioAdapter(TelephonyAdapter):
     def hangup_response(self, reply_text, language, audio_url=None):
         response = VoiceResponse()
         self._speak(response, reply_text, language, audio_url)
+        response.hangup()
+        return str(response)
+
+    def realtime_connect_response(self, stream_url: str, caller_number: str = "") -> str:
+        """Verbindet den Anruf mit dem Echtzeit-Media-Stream (WebSocket).
+
+        Nach Ende des Streams folgt <Hangup>, sodass der Anruf beendet wird,
+        sofern er nicht zuvor per REST-API weitergeleitet wurde.
+        """
+        response = VoiceResponse()
+        connect = Connect()
+        stream = connect.stream(url=stream_url)
+        if caller_number:
+            stream.parameter(name="from", value=caller_number)
+        response.append(connect)
         response.hangup()
         return str(response)
 

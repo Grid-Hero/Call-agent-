@@ -14,8 +14,8 @@ from typing import Optional
 from app.ai.agent import CallAgent
 from app.config import Settings
 from app.directory import Directory
+from app.finalize import finish_with_message
 from app.models import Action, CallSession, RoutingDecision, Speaker
-from app.notify.email import send_summary
 from app.telephony.base import TelephonyAdapter
 from app.tts.base import NullTTS, TTSProvider
 
@@ -152,11 +152,6 @@ class Orchestrator:
         return self.adapter.hangup_response(text, self.settings.agent_language, await self._voice(text))
 
     async def _finish_with_message(self, session: CallSession, transferred_note: bool = False) -> None:
-        """Zusammenfassung erzeugen und an die zuständige Abteilung mailen."""
-        summary = await self.agent.summarize(session)
-        _name, email, _phone, _ = self.directory.routing_target(session.department_id)
-        to_addr = email or self.settings.email_fallback_to
-        if transferred_note:
-            summary.subject = f"[durchgestellt] {summary.subject}"
-        await send_summary(summary, session, self.settings, to_addr)
+        """Zusammenfassung erzeugen, mailen und Session beenden."""
+        await finish_with_message(self.agent, self.directory, self.settings, session, transferred_note)
         self.store.pop(session.call_sid)

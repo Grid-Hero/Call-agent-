@@ -18,6 +18,7 @@ Telefonie ist über eine **austauschbare Adapter-Schicht** angebunden
 - [Architektur](#architektur)
 - [Telekom-PBX anbinden](#telekom-pbx-anbinden)
 - [Stimme (ElevenLabs)](#stimme-elevenlabs)
+- [Echtzeit-Modus (Media Streams)](#echtzeit-modus-media-streams)
 - [Schnellstart](#schnellstart)
 - [Konfiguration](#konfiguration)
 - [Mitarbeiterverzeichnis](#mitarbeiterverzeichnis-anpassen)
@@ -64,7 +65,9 @@ Außerhalb der Geschäftszeiten (in `config/directory.yaml` definiert) wird
 | Modul                          | Aufgabe                                                  |
 |--------------------------------|----------------------------------------------------------|
 | `app/main.py`                  | FastAPI-App, Telefonie-Webhooks, Signaturprüfung         |
-| `app/orchestrator.py`          | Anruf-Ablauf, Session-Verwaltung, verbindet alle Teile   |
+| `app/orchestrator.py`          | Anruf-Ablauf (Gather-Modus), Session-Verwaltung          |
+| `app/realtime/`                | Echtzeit-Modus: Media Streams, STT, Streaming-TTS, Barge-in |
+| `app/finalize.py`              | Gemeinsamer Abschluss: Zusammenfassung erzeugen + mailen |
 | `app/ai/agent.py`              | Claude: Routing-Entscheidung + Zusammenfassung (Tool-Use)|
 | `app/telephony/base.py`        | Abstrakte Telefonie-Schnittstelle                        |
 | `app/telephony/twilio_adapter.py` | Twilio-Implementierung (TwiML, Signaturprüfung)       |
@@ -151,6 +154,54 @@ ELEVENLABS_MODEL=eleven_multilingual_v2   # unterstützt Deutsch
 
 ---
 
+## Echtzeit-Modus (Media Streams)
+
+Neben dem einfachen **Gather-Modus** (Frage-Antwort, Anrufer wartet) gibt es den
+**Echtzeit-Modus** für natürliche, unterbrechbare Dialoge mit niedriger Latenz:
+
+```
+Anrufer ⇄ Twilio Media Stream (WebSocket, μ-law 8 kHz)
+              │  bidirektional
+   ┌──────────┴───────────┐
+   ▼                      ▲
+Deepgram STT          ElevenLabs TTS (Streaming, μ-law)
+(Streaming, de)           ▲
+   │ Transkript           │ Antworttext
+   ▼                      │
+        Claude (decide) ──┘
+   + Barge-in: Anrufer kann den Agent jederzeit unterbrechen
+```
+
+Aktivieren über `CONVERSATION_MODE=realtime` (zusätzlich zu ElevenLabs-Keys):
+
+```bash
+CONVERSATION_MODE=realtime
+DEEPGRAM_API_KEY=...        # Streaming-Spracherkennung (Deutsch)
+ELEVENLABS_API_KEY=...      # Stimme (streamt μ-law direkt)
+ELEVENLABS_VOICE_ID=...
+```
+
+**Eigenschaften:**
+- **Kein Audio-Transcoding** – Deepgram nimmt μ-law 8 kHz entgegen, ElevenLabs
+  liefert μ-law 8 kHz aus; beides Twilios natives Format.
+- **Barge-in** – spricht der Anrufer, während der Agent redet, wird die
+  Wiedergabe per `clear` sofort gestoppt.
+- **Weiterleiten** – im Media Stream nicht via `<Dial>` möglich; der Anruf wird
+  über die Twilio-REST-API auf neues TwiML umgeleitet (`app/realtime/call_control.py`).
+- **Austauschbar** – STT (`app/realtime/stt.py`), TTS (`app/realtime/tts_stream.py`)
+  und Anrufsteuerung sind über Schnittstellen gekapselt und per Fakes testbar.
+
+> **Setup-Hinweis:** Der WebSocket-Endpunkt ist `wss://<APP_BASE_URL>/media`
+> (aus `APP_BASE_URL` abgeleitet) und muss öffentlich (TLS) erreichbar sein.
+> Twilio verbindet den Anruf automatisch dorthin, sobald `CONVERSATION_MODE=realtime`.
+
+> **Wann welcher Modus?** `gather` ist robuster und einfacher zu betreiben (keine
+> Dauer-WebSockets, geringere Kosten). `realtime` fühlt sich natürlicher an, hat
+> aber mehr bewegliche Teile (STT-Stream, WS-Stabilität). Beide nutzen dieselbe
+> Claude-Logik und denselben E-Mail-/Weiterleitungs-Pfad.
+
+---
+
 ## Schnellstart
 
 ```bash
@@ -186,7 +237,8 @@ Wichtigste Werte:
 
 | Variable                  | Zweck                                               |
 |---------------------------|-----------------------------------------------------|
-| `APP_BASE_URL`            | Öffentliche URL der App (für Webhook-Callbacks)      |
+| `APP_BASE_URL`            | Öffentliche URL der App (für Webhooks + WS-Ableitung)|
+| `CONVERSATION_MODE`       | `gather` (einfach) oder `realtime` (Media Streams)   |
 | `TELEPHONY_PROVIDER`      | `twilio` oder `asterisk`                             |
 | `TWILIO_*`                | Twilio-Zugangsdaten + eingehende Nummer             |
 | `TWILIO_VALIDATE_SIGNATURE` | Webhook-Signaturprüfung (in Produktion `true`)    |
@@ -194,6 +246,7 @@ Wichtigste Werte:
 | `ANTHROPIC_MODEL`         | Claude-Modell (Standard: `claude-opus-4-8`)         |
 | `TTS_PROVIDER`            | Stimme: `twilio` oder `elevenlabs`                  |
 | `ELEVENLABS_*`            | ElevenLabs-Key, Voice-ID, Modell (bei `elevenlabs`) |
+| `DEEPGRAM_*`              | Streaming-STT (nur Echtzeit-Modus)                  |
 | `SMTP_*`, `EMAIL_*`       | E-Mail-Versand der Zusammenfassungen                |
 | `DIRECTORY_PATH`          | Pfad zur Verzeichnis-YAML                           |
 
@@ -244,10 +297,10 @@ Anruf-Ablauf (continue/transfer/message + Fallback) ab.
 
 ## Nächste Schritte / Roadmap
 
-- [ ] **Persistenz**: In-Memory-`SessionStore` durch Redis oder Supabase
-      ersetzen (für Skalierung über mehrere Instanzen).
-- [ ] **Echtzeit-Audio**: Twilio Media Streams + Deepgram für natürlichere,
-      unterbrechbare Dialoge (statt `<Gather>`).
+- [x] **Echtzeit-Audio**: Twilio Media Streams + Deepgram + ElevenLabs-Streaming
+      mit Barge-in (`CONVERSATION_MODE=realtime`).
+- [ ] **Persistenz**: In-Memory-`SessionStore`/`AudioStore` durch Redis oder
+      Supabase ersetzen (für Skalierung über mehrere Instanzen).
 - [ ] **Weitere Kanäle**: Zusammenfassung zusätzlich in Slack/Teams.
 - [ ] **Asterisk-Adapter** vollständig implementieren (Weg B).
 - [ ] **CRM-Anbindung**: erkannte Anliegen direkt als Ticket/Lead anlegen.

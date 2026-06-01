@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, Form, Request, Response
+from fastapi import FastAPI, Request, Response, WebSocket
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.ai.agent import CallAgent
@@ -74,6 +74,13 @@ async def voice_incoming(request: Request) -> Response:
     form = dict(await request.form())
     if not await _validate_twilio(request, form):
         return PlainTextResponse("Ungültige Signatur", status_code=403)
+
+    # Echtzeit-Modus: Anruf mit dem Media Stream (WebSocket) verbinden.
+    if settings.conversation_mode == "realtime" and isinstance(adapter, TwilioAdapter):
+        caller = form.get("From", "")
+        stream_url = f"{settings.websocket_base_url}/media"
+        return _twiml(adapter.realtime_connect_response(stream_url, caller))
+
     return _twiml(await orchestrator.handle_incoming(form))
 
 
@@ -101,8 +108,33 @@ async def serve_audio(token: str) -> Response:
 
 @app.post("/voice/after-transfer")
 async def voice_after_transfer(request: Request) -> Response:
-    """Wird nach Abschluss einer Weiterleitung aufgerufen."""
+    """Wird nach Abschluss einer Weiterleitung aufgerufen (Gather-Modus)."""
     form = dict(await request.form())
     if not await _validate_twilio(request, form):
         return PlainTextResponse("Ungültige Signatur", status_code=403)
     return _twiml(await orchestrator.handle_after_transfer(form))
+
+
+@app.websocket("/media")
+async def media_stream(websocket: WebSocket) -> None:
+    """Twilio Media Stream (Echtzeit-Modus): bidirektionales Audio über WebSocket."""
+    await websocket.accept()
+    from app.realtime.factory import build_call_control, build_streaming_tts, build_stt
+    from app.realtime.session import RealtimeCallSession
+    from app.realtime.transport import TwilioWebSocketTransport
+
+    transport = TwilioWebSocketTransport(websocket)
+    realtime = RealtimeCallSession(
+        settings,
+        directory,
+        agent,
+        transport,
+        build_stt(settings),
+        build_streaming_tts(settings),
+        build_call_control(settings),
+    )
+    try:
+        await realtime.run()
+    except Exception:  # pragma: no cover - Laufzeitschutz
+        logger.exception("Fehler im Media Stream")
+        await transport.close()
