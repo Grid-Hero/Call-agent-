@@ -46,17 +46,34 @@ def _twiml(body: str) -> Response:
 
 
 async def _validate_twilio(request: Request, form: dict) -> bool:
-    """Prüft die Twilio-Signatur (Schutz vor gefälschten Webhooks)."""
+    """Prüft die Twilio-Signatur (Schutz vor gefälschten Webhooks).
+
+    Robust gegen Reverse-Proxies (z.B. Render): Twilio signiert die ÖFFENTLICHE
+    URL, hinter dem Proxy sieht die App aber oft eine interne. Daher werden
+    mehrere plausible URL-Varianten geprüft. Ohne Auth-Token ist keine Prüfung
+    möglich – dann wird sie (mit Warnung) übersprungen, statt den Anruf mit
+    einem Fehler abzubrechen.
+    """
     if not isinstance(adapter, TwilioAdapter):
         return True
+    if not settings.twilio_validate_signature:
+        return True
+    if not settings.twilio_auth_token:
+        logger.warning("Kein TWILIO_AUTH_TOKEN gesetzt – Signaturprüfung übersprungen.")
+        return True
+
     signature = request.headers.get("X-Twilio-Signature", "")
-    # Hinter einem Reverse-Proxy (z.B. Render) zeigt request.url oft die interne
-    # URL (http/anderer Host). Twilio signiert aber die ÖFFENTLICHE URL, daher
-    # rekonstruieren wir sie aus der bekannten Basis-URL + Pfad.
-    url = f"{settings.effective_base_url}{request.url.path}"
-    if request.url.query:
-        url = f"{url}?{request.url.query}"
-    return adapter.validate_signature(url, form, signature)
+    path_q = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+    candidates = [
+        f"{settings.effective_base_url}{path_q}",
+        str(request.url),
+        str(request.url).replace("http://", "https://", 1),
+    ]
+    for url in candidates:
+        if adapter.validate_signature(url, form, signature):
+            return True
+    logger.warning("Twilio-Signatur ungültig. Geprüfte URLs: %s", candidates)
+    return False
 
 
 # --- Routen ------------------------------------------------------------------
