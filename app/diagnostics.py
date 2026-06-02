@@ -76,7 +76,24 @@ async def check_elevenlabs(s: Settings) -> Check:
         return Check(name, "fail", str(exc)[:100])
 
 
-async def check_smtp(s: Settings) -> Check:
+async def check_email(s: Settings) -> Check:
+    """Prüft den konfigurierten E-Mail-Weg (Brevo-API oder SMTP)."""
+    if (s.email_provider or "smtp").lower() == "brevo":
+        name = "E-Mail (Brevo-API)"
+        if not s.brevo_api_key:
+            return Check(name, "fail", "BREVO_API_KEY fehlt")
+        try:
+            async with httpx.AsyncClient(timeout=10) as c:
+                r = await c.get(
+                    "https://api.brevo.com/v3/account",
+                    headers={"api-key": s.brevo_api_key, "accept": "application/json"},
+                )
+            if r.status_code == 200:
+                return Check(name, "ok", "API-Key gültig")
+            return Check(name, "fail", f"HTTP {r.status_code} (Key prüfen)")
+        except Exception as exc:  # noqa: BLE001
+            return Check(name, "fail", str(exc)[:100])
+
     name = "E-Mail (SMTP)"
     if not s.smtp_host:
         return Check(name, "fail", "SMTP_HOST fehlt")
@@ -145,7 +162,7 @@ def check_directory(directory) -> Check:
 
 async def run_checks(s: Settings, directory=None) -> list[Check]:
     """Führt alle relevanten Checks parallel aus."""
-    service_checks = [check_claude(s), check_twilio(s), check_smtp(s)]
+    service_checks = [check_claude(s), check_twilio(s), check_email(s)]
     if s.tts_provider == "elevenlabs" or s.conversation_mode == "realtime":
         service_checks.append(check_elevenlabs(s))
     results = list(await asyncio.gather(*service_checks))

@@ -195,3 +195,30 @@ def test_calls_page_requires_auth_and_renders(tmp_path):
     r = client.get("/admin/calls", auth=("admin", "geheim"))
     assert r.status_code == 200
     assert "Anruf-Protokoll" in r.text
+
+
+@pytest.mark.asyncio
+async def test_email_provider_brevo_dispatch(monkeypatch):
+    import app.notify.email as email
+    from app.config import Settings
+
+    captured = {}
+
+    async def fake_brevo(settings, to_addr, subject, body):
+        captured["called"] = True
+        return True, "gesendet (Brevo-API)"
+
+    monkeypatch.setattr(email, "_deliver_brevo", fake_brevo)
+    s = Settings(email_provider="brevo", brevo_api_key="key", email_from="a@b.de")
+    ok, msg = await email.send_test_email(s, "x@y.de")
+    assert ok and captured.get("called") is True
+
+
+@pytest.mark.asyncio
+async def test_email_brevo_without_key_reports_failure():
+    import app.notify.email as email
+    from app.config import Settings
+
+    s = Settings(email_provider="brevo", brevo_api_key="", email_from="a@b.de")
+    ok, msg = await email.send_test_email(s, "x@y.de")
+    assert not ok and "BREVO_API_KEY" in msg

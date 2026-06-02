@@ -72,6 +72,9 @@ class Settings(BaseSettings):
         return self.agent_language.split("-")[0]
 
     # E-Mail
+    # Versandweg: "smtp" (klassisch) oder "brevo" (HTTP-API, robust auf Cloud).
+    email_provider: str = "smtp"
+    brevo_api_key: str = ""
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""

@@ -53,6 +53,11 @@ services:
         sync: false
       - key: TWILIO_PHONE_NUMBER
         sync: false
+      # E-Mail-Weg: "smtp" oder "brevo" (HTTP-API, robuster auf Render)
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: BREVO_API_KEY
+        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_USERNAME
