@@ -73,6 +73,7 @@ async def send_summary(
             username=settings.smtp_username or None,
             password=settings.smtp_password or None,
             start_tls=settings.smtp_use_tls,
+            timeout=20,
         )
         logger.info("Zusammenfassung an %s gesendet (Anruf %s)", to_addr, session.call_sid)
         return True

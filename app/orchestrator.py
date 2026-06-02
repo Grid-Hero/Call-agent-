@@ -7,6 +7,7 @@ nächsten Telefonie-Befehl (z.B. TwiML) zurück.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from typing import Optional
@@ -58,10 +59,17 @@ class Orchestrator:
         self.agent = agent
         self.store = store or SessionStore()
         self.tts = tts or NullTTS()
+        self._bg_tasks: set = set()
 
     # --- URLs für Webhook-Callbacks -----------------------------------------
     def _url(self, path: str) -> str:
         return f"{self.settings.effective_base_url}{path}"
+
+    def _run_bg(self, coro) -> None:
+        """Startet eine Hintergrundaufgabe (z.B. E-Mail), ohne darauf zu warten."""
+        task = asyncio.ensure_future(coro)
+        self._bg_tasks.add(task)
+        task.add_done_callback(self._bg_tasks.discard)
 
     async def _voice(self, text: str) -> Optional[str]:
         """Synthetisiert den Text via TTS-Anbieter; None => Anbieter-Stimme."""
@@ -124,7 +132,7 @@ class Orchestrator:
                 )
             # Durchstellen nicht erlaubt/möglich -> Nachricht aufnehmen.
             logger.info("Transfer für %s nicht möglich, weiche auf Nachricht aus", name)
-            await self._finish_with_message(session)
+            self._finalize_async(session)
             text = (
                 "Ich leite Ihr Anliegen an die zuständige Stelle weiter. "
                 "Ein Mitarbeiter meldet sich bei Ihnen. Auf Wiederhören!"
@@ -132,7 +140,7 @@ class Orchestrator:
             return self.adapter.hangup_response(text, lang, await self._voice(text))
 
         if decision.action == Action.MESSAGE:
-            await self._finish_with_message(session)
+            self._finalize_async(session)
             return self.adapter.hangup_response(
                 decision.reply_text, lang, await self._voice(decision.reply_text)
             )
@@ -147,11 +155,17 @@ class Orchestrator:
         call_sid, _, _ = self.adapter.parse_incoming(form)
         session = self.store.get(call_sid)
         if session:
-            await self._finish_with_message(session, transferred_note=True)
+            self._finalize_async(session, transferred_note=True)
         text = "Vielen Dank für Ihren Anruf. Auf Wiederhören!"
         return self.adapter.hangup_response(text, self.settings.agent_language, await self._voice(text))
 
-    async def _finish_with_message(self, session: CallSession, transferred_note: bool = False) -> None:
-        """Zusammenfassung erzeugen, mailen und Session beenden."""
-        await finish_with_message(self.agent, self.directory, self.settings, session, transferred_note)
+    def _finalize_async(self, session: CallSession, transferred_note: bool = False) -> None:
+        """Beendet die Session sofort und erzeugt/mailt die Zusammenfassung im Hintergrund.
+
+        Der Anruf wartet so NIE auf Claude-Zusammenfassung oder den (ggf. langsamen)
+        E-Mail-Versand – sonst läuft Twilios Webhook-Timeout ab.
+        """
         self.store.pop(session.call_sid)
+        self._run_bg(
+            finish_with_message(self.agent, self.directory, self.settings, session, transferred_note)
+        )
