@@ -121,8 +121,32 @@ class CallAgent:
     def __init__(self, settings: Settings, directory: Directory):
         self.settings = settings
         self.directory = directory
-        self.client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+        # Timeout begrenzen, damit ein Aufruf das Twilio-Webhook-Budget nicht sprengt.
+        self.client = AsyncAnthropic(api_key=settings.anthropic_api_key, timeout=12.0)
         self.model = settings.anthropic_model
+        self.fallback_model = settings.anthropic_fallback_model
+
+    async def _create(self, *, system, messages, tools, tool_name: str):
+        """Ruft Claude auf; bei Überlastung/Fehler einmaliger Fallback auf ein
+        schnelleres Modell (z.B. Haiku), damit Anrufe robust bleiben."""
+        models = [self.model]
+        if self.fallback_model and self.fallback_model != self.model:
+            models.append(self.fallback_model)
+        last_exc: Exception | None = None
+        for model in models:
+            try:
+                return await self.client.messages.create(
+                    model=model,
+                    max_tokens=1024,
+                    system=system,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice={"type": "tool", "name": tool_name},
+                )
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                logger.warning("Claude-Aufruf mit Modell %s fehlgeschlagen: %s", model, exc)
+        raise last_exc  # type: ignore[misc]
 
     def _messages(self, session: CallSession) -> list[dict]:
         """Wandelt den Gesprächsverlauf in Anthropic-Nachrichten um."""
@@ -145,13 +169,11 @@ class CallAgent:
             }
         ]
         try:
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=1024,
+            response = await self._create(
                 system=system,
                 messages=self._messages(session),
                 tools=[ROUTING_TOOL],
-                tool_choice={"type": "tool", "name": "gespraech_steuern"},
+                tool_name="gespraech_steuern",
             )
             payload = _extract_tool_input(response, "gespraech_steuern")
             return RoutingDecision(
@@ -181,13 +203,11 @@ class CallAgent:
         )
         transcript = session.transcript() or "(kein Wortlaut erfasst)"
         try:
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=1024,
+            response = await self._create(
                 system=system,
                 messages=[{"role": "user", "content": f"Gesprächsprotokoll:\n\n{transcript}"}],
                 tools=[SUMMARY_TOOL],
-                tool_choice={"type": "tool", "name": "zusammenfassung_erstellen"},
+                tool_name="zusammenfassung_erstellen",
             )
             p = _extract_tool_input(response, "zusammenfassung_erstellen")
             return CallSummary(
