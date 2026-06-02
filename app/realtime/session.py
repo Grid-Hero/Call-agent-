@@ -19,7 +19,7 @@ from typing import Optional
 
 from app.ai.agent import CallAgent
 from app.config import Settings
-from app.directory import Directory
+from app.directory import Directory, is_demo_phone
 from app.finalize import finish_with_message
 from app.models import Action, CallSession, RoutingDecision, Speaker
 from app.realtime.call_control import CallControl
@@ -173,7 +173,7 @@ class RealtimeCallSession:
             _name, _email, phone, transfer_ok = self.directory.routing_target(
                 self.session.department_id
             )
-            if transfer_ok and phone:
+            if transfer_ok and phone and not is_demo_phone(phone):
                 await self._say_and_wait(decision.reply_text)
                 self.session.transferred = True
                 await self.call_control.transfer(self.call_sid, phone)

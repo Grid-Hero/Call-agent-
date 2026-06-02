@@ -51,6 +51,8 @@ async def test_incoming_creates_session_and_greets(settings, directory):
 
 @pytest.mark.asyncio
 async def test_transfer_flow(settings, directory):
+    # Echte (nicht-Demo) Nummer setzen, damit durchgestellt wird.
+    directory.get("support").phone = "+4915123456789"
     decision = RoutingDecision(action=Action.TRANSFER, reply_text="Ich verbinde Sie.", department_id="support")
     orch = _orchestrator(settings, directory, decision)
     await orch.handle_incoming({"CallSid": "CA2", "From": "+4915100", "To": "+4930"})
@@ -101,10 +103,32 @@ async def test_elevenlabs_audio_played_via_play(settings, directory):
     assert "<Say" not in xml
 
 
-def test_is_transient_classification():
-    from app.ai.agent import _is_transient
+def test_should_retry_other_model():
+    from app.ai.agent import _should_retry_other_model
 
-    assert _is_transient(Exception("Error code: 529 - overloaded_error"))
-    assert _is_transient(Exception("Request timed out"))
-    assert not _is_transient(Exception("Error code: 401 - authentication_error"))
-    assert not _is_transient(Exception("not_found_error: model"))
+    assert _should_retry_other_model(Exception("Error code: 529 - overloaded_error"))
+    assert _should_retry_other_model(Exception("Request timed out"))
+    # Modell falsch konfiguriert -> Fallback-Modell kann helfen (Selbstheilung)
+    assert _should_retry_other_model(Exception("not_found_error: model claude-x"))
+    # Auth-Fehler -> anderes Modell hilft nicht
+    assert not _should_retry_other_model(Exception("Error code: 401 - authentication_error"))
+
+
+@pytest.mark.asyncio
+async def test_transfer_to_demo_number_takes_message(settings, directory):
+    # vertrieb hat transfer_enabled=true, aber eine Demo-Nummer (+49301111111)
+    # -> kein Durchstellen ins Leere, stattdessen Nachricht aufnehmen.
+    decision = RoutingDecision(action=Action.TRANSFER, reply_text="Moment.", department_id="vertrieb")
+    orch = _orchestrator(settings, directory, decision)
+    await orch.handle_incoming({"CallSid": "CA9", "From": "+4915100", "To": "+4930"})
+    xml = await orch.handle_speech({"CallSid": "CA9", "From": "+4915100", "SpeechResult": "Angebot bitte"})
+    assert "<Dial" not in xml
+    assert "<Hangup" in xml
+
+
+def test_is_demo_phone():
+    from app.directory import is_demo_phone
+
+    assert is_demo_phone("+49301111111")
+    assert is_demo_phone("")
+    assert not is_demo_phone("+4915123456789")

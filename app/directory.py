@@ -124,6 +124,15 @@ _WEEKDAYS = (
 )
 
 
+_DEMO_PHONE_PREFIXES = ("+49301111", "+49302222", "+49303333", "+49304444", "+49300000")
+
+
+def is_demo_phone(phone: str) -> bool:
+    """True für leere oder offensichtliche Platzhalter-/Demo-Telefonnummern."""
+    phone = (phone or "").strip()
+    return not phone or any(phone.startswith(p) for p in _DEMO_PHONE_PREFIXES)
+
+
 def directory_to_dict(directory: Directory) -> dict:
     """Wandelt ein Directory zurück in die YAML-Struktur (für Speichern/Anzeige)."""
     bh = {"timezone": directory.business_hours.timezone}

@@ -122,10 +122,10 @@ def check_directory(directory) -> Check:
     ]
     if directory.fallback.email.endswith("@example.com"):
         demo_emails.append(directory.fallback.department_name)
+    from app.directory import is_demo_phone
+
     demo_phones = [
-        d.name
-        for d in directory.departments
-        if d.phone.startswith(("+49301111", "+49302222", "+49303333", "+49304444", "+49300000"))
+        d.name for d in directory.departments if d.phone and is_demo_phone(d.phone)
     ]
     no_email = [d.name for d in directory.departments if not d.email]
 

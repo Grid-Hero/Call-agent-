@@ -123,11 +123,12 @@ async def test_continue_does_not_hang_up(settings, directory):
 
 @pytest.mark.asyncio
 async def test_transfer_routes_and_finishes(settings, directory):
+    directory.get("support").phone = "+4915123456789"  # echte Nummer
     decision = RoutingDecision(action=Action.TRANSFER, reply_text="Ich verbinde Sie.", department_id="support")
     s = _session(settings, directory, decision)
     await s._handle_utterance("Mein Gerät ist defekt")
-    # support hat eine Telefonnummer und transfer_enabled -> Durchstellen
-    assert s.call_control.transferred_to == "+49302222222"
+    # support hat eine echte Telefonnummer und transfer_enabled -> Durchstellen
+    assert s.call_control.transferred_to == "+4915123456789"
     assert s.session.transferred is True
     assert s._done.is_set() is True
 

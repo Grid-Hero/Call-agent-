@@ -151,9 +151,9 @@ class CallAgent:
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
                 is_last = idx == len(models) - 1
-                if is_last or not _is_transient(exc):
+                if is_last or not _should_retry_other_model(exc):
                     raise
-                logger.warning("Claude-Modell %s überlastet/Timeout – Fallback: %s", model, exc)
+                logger.warning("Claude-Modell %s nicht nutzbar – versuche Fallback: %s", model, exc)
         raise last_exc  # type: ignore[misc]
 
     def _messages(self, session: CallSession) -> list[dict]:
@@ -242,14 +242,20 @@ class CallAgent:
             )
 
 
-def _is_transient(exc: Exception) -> bool:
-    """True bei vorübergehenden Fehlern, bei denen ein Fallback-Versuch sinnvoll ist."""
+def _should_retry_other_model(exc: Exception) -> bool:
+    """True, wenn ein Versuch mit dem (anderen) Fallback-Modell sinnvoll ist.
+
+    - Auth-/Key-/Berechtigungsfehler: anderes Modell hilft nicht (gleicher Key) -> nein
+    - Modell nicht gefunden (z.B. falsch konfigurierte ANTHROPIC_MODEL): das
+      gültige Fallback-Modell kann helfen -> ja (Selbstheilung)
+    - Vorübergehend (Überlastung/Timeout/5xx): anderes Modell probieren -> ja
+    """
     msg = str(exc).lower()
-    transient = ("overload", "529", "timeout", "timed out", "502", "503", "504", "connect")
-    permanent = ("not_found", "404", "authentication", "401", "permission", "invalid x-api-key", "400")
-    if any(p in msg for p in permanent):
+    if any(p in msg for p in ("authentication", "401", "invalid x-api-key", "permission")):
         return False
-    return any(t in msg for t in transient)
+    if "not_found" in msg or "404" in msg:
+        return True
+    return any(t in msg for t in ("overload", "529", "timeout", "timed out", "502", "503", "504", "connect"))
 
 
 def _extract_tool_input(response, tool_name: str) -> dict:
