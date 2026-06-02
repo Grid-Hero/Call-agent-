@@ -55,7 +55,7 @@ services:
         sync: false
       # E-Mail-Weg: "smtp" oder "brevo" (HTTP-API, robuster auf Render)
       - key: EMAIL_PROVIDER
-        value: smtp
+        value: brevo
       - key: BREVO_API_KEY
         sync: false
       - key: SMTP_HOST
