@@ -133,6 +133,12 @@ def is_demo_phone(phone: str) -> bool:
     return not phone or any(phone.startswith(p) for p in _DEMO_PHONE_PREFIXES)
 
 
+def is_demo_email(email: str) -> bool:
+    """True für leere oder Platzhalter-E-Mails (@example.com)."""
+    email = (email or "").strip().lower()
+    return not email or email.endswith("@example.com") or email.endswith("@example.org")
+
+
 def directory_to_dict(directory: Directory) -> dict:
     """Wandelt ein Directory zurück in die YAML-Struktur (für Speichern/Anzeige)."""
     bh = {"timezone": directory.business_hours.timezone}

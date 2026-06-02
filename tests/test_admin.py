@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -130,3 +131,43 @@ def test_test_email_without_smtp_reports_failure(tmp_path):
     )
     assert r.status_code == 303
     assert "/admin/status" in r.headers["location"]
+
+
+def test_is_demo_email():
+    from app.directory import is_demo_email
+
+    assert is_demo_email("vertrieb@example.com")
+    assert is_demo_email("")
+    assert not is_demo_email("schmidt@planetingreen.de")
+
+
+@pytest.mark.asyncio
+async def test_finalize_routes_demo_email_to_fallback(tmp_path, monkeypatch):
+    import app.finalize as fin
+    from app.directory import load_directory
+
+    captured = {}
+
+    async def fake_send(summary, session, settings, to_addr):
+        captured["to"] = to_addr
+        return True
+
+    monkeypatch.setattr(fin, "send_summary", fake_send)
+
+    s = _settings(tmp_path)
+    s = s.model_copy(update={"email_fallback_to": "echt@planetingreen.de"})
+    directory = load_directory(str(tmp_path / "directory.yaml"))
+
+    class _Agent:
+        async def summarize(self, session):
+            from app.models import CallSummary
+            return CallSummary(
+                caller_number="+49", department_id="vertrieb",
+                department_name="Vertrieb", subject="x", summary="y", caller_request="z",
+            )
+
+    from app.models import CallSession
+    sess = CallSession(call_sid="C", caller_number="+49", department_id="vertrieb")
+    await fin.finish_with_message(_Agent(), directory, s, sess)
+    # vertrieb hat @example.com -> echte Fallback-Adresse wird verwendet
+    assert captured["to"] == "echt@planetingreen.de"
