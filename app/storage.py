@@ -102,15 +102,29 @@ class GitHubStore(DirectoryStore):
             except Exception:  # pragma: no cover
                 logger.exception("SHA-Abfrage fehlgeschlagen")
 
-        body = {
-            "message": message,
-            "content": base64.b64encode(text.encode("utf-8")).decode("ascii"),
-            "branch": self.branch,
-        }
-        if self._sha:
-            body["sha"] = self._sha
+        def _put(sha: str | None):
+            body = {
+                "message": message,
+                "content": base64.b64encode(text.encode("utf-8")).decode("ascii"),
+                "branch": self.branch,
+            }
+            if sha:
+                body["sha"] = sha
+            return httpx.put(self._contents_url(), headers=self._headers(), json=body, timeout=20)
 
-        r = httpx.put(self._contents_url(), headers=self._headers(), json=body, timeout=20)
+        r = _put(self._sha)
+        # SHA veraltet/Konflikt (z.B. zwischenzeitlicher Commit) -> frische SHA holen, einmal erneut.
+        if r.status_code in (409, 422):
+            logger.warning("GitHub-Commit SHA-Konflikt – hole aktuelle SHA und versuche erneut")
+            try:
+                g = httpx.get(
+                    self._contents_url(), headers=self._headers(),
+                    params={"ref": self.branch}, timeout=15,
+                )
+                self._sha = g.json().get("sha") if g.status_code == 200 else None
+            except Exception:  # pragma: no cover
+                self._sha = None
+            r = _put(self._sha)
         r.raise_for_status()
         self._sha = r.json()["content"]["sha"]
         logger.info("Konfiguration nach GitHub committet (%s@%s)", self.path, self.branch)

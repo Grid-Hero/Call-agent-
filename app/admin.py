@@ -7,6 +7,8 @@ Begrüßung, Geschäftszeiten und Abteilungen und schreibt sie nach
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
 import secrets
 
@@ -81,6 +83,7 @@ def create_admin_router(runtime: Runtime) -> APIRouter:
         from app.storage import GitHubStore
 
         saved = request.query_params.get("saved") == "1"
+        err = request.query_params.get("err")
         if isinstance(runtime.store, GitHubStore):
             storage_note = "💾 Speicherung: <b>GitHub</b> – Änderungen sind dauerhaft (als Commit)."
         else:
@@ -88,14 +91,24 @@ def create_admin_router(runtime: Runtime) -> APIRouter:
                 "⚠️ Speicherung: <b>lokal</b> – auf Render Free gehen Änderungen bei "
                 "Neustart verloren. Für dauerhaftes Speichern GitHub einrichten (siehe docs/ADMIN.md)."
             )
-        return HTMLResponse(_render_page(runtime.directory, saved, storage_note))
+        return HTMLResponse(_render_page(runtime.directory, saved, storage_note, err))
 
     @router.post("")
     async def admin_save(request: Request, _: bool = Depends(require_admin)) -> RedirectResponse:
+        from urllib.parse import quote
+
         form = await request.form()
         directory = _parse_form(form)
-        runtime.save_directory(directory)
-        return RedirectResponse(url="/admin?saved=1", status_code=status.HTTP_303_SEE_OTHER)
+        # In Thread auslagern: store.save kann (bei GitHub) blockierend HTTP machen
+        # und würde sonst den Event-Loop und damit laufende Anrufe einfrieren.
+        try:
+            await asyncio.to_thread(runtime.save_directory, directory)
+            return RedirectResponse(url="/admin?saved=1", status_code=status.HTTP_303_SEE_OTHER)
+        except Exception as exc:  # noqa: BLE001 - Persistierung fehlgeschlagen
+            logging.getLogger(__name__).exception("Speichern der Konfiguration fehlgeschlagen")
+            # Änderung ist bereits live (apply_directory lief vor dem Store-Write).
+            msg = quote(f"Live übernommen, aber Speichern fehlgeschlagen: {str(exc)[:160]}")
+            return RedirectResponse(url=f"/admin?err={msg}", status_code=status.HTTP_303_SEE_OTHER)
 
     @router.get("/status", response_class=HTMLResponse)
     async def admin_status(request: Request, _: bool = Depends(require_admin)) -> HTMLResponse:
@@ -193,7 +206,7 @@ def _dept_row(i, d: Department | None = None) -> str:
     """
 
 
-def _render_page(directory: Directory, saved: bool, storage_note: str = "") -> str:
+def _render_page(directory: Directory, saved: bool, storage_note: str = "", err: str | None = None) -> str:
     bh = directory.business_hours
     days_html = ""
     for key, label in _WEEKDAYS:
@@ -215,6 +228,8 @@ def _render_page(directory: Directory, saved: bool, storage_note: str = "") -> s
     banner = (
         '<div class="ok">✅ Gespeichert – Änderungen sind sofort aktiv.</div>' if saved else ""
     )
+    if err:
+        banner += f'<div class="err">⚠️ {_esc(err)}</div>'
 
     return f"""<!doctype html>
 <html lang="de"><head><meta charset="utf-8">
@@ -235,6 +250,7 @@ def _render_page(directory: Directory, saved: bool, storage_note: str = "") -> s
   button {{ background:#2d6cdf; color:#fff; border:0; padding:11px 18px; border-radius:8px; font-size:1rem; cursor:pointer; }}
   button.secondary {{ background:#666; }}
   .ok {{ background:#e6f7ec; border:1px solid #93d6ab; padding:10px 14px; border-radius:8px; margin-bottom:16px; }}
+  .err {{ background:#fdecea; border:1px solid #e0a0a0; padding:10px 14px; border-radius:8px; margin-bottom:16px; }}
   .hint {{ color:#666; font-size:.82rem; }}
 </style></head>
 <body>

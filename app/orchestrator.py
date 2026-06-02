@@ -69,7 +69,13 @@ class Orchestrator:
         """Startet eine Hintergrundaufgabe (z.B. E-Mail), ohne darauf zu warten."""
         task = asyncio.ensure_future(coro)
         self._bg_tasks.add(task)
-        task.add_done_callback(self._bg_tasks.discard)
+
+        def _done(t: asyncio.Task) -> None:
+            self._bg_tasks.discard(t)
+            if not t.cancelled() and t.exception() is not None:
+                logger.error("Hintergrundaufgabe fehlgeschlagen", exc_info=t.exception())
+
+        task.add_done_callback(_done)
 
     async def _voice(self, text: str) -> Optional[str]:
         """Synthetisiert den Text via TTS-Anbieter; None => Anbieter-Stimme."""

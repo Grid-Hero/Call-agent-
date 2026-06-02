@@ -99,3 +99,12 @@ async def test_elevenlabs_audio_played_via_play(settings, directory):
     assert "<Play>" in xml
     assert "audio/abc.mp3" in xml
     assert "<Say" not in xml
+
+
+def test_is_transient_classification():
+    from app.ai.agent import _is_transient
+
+    assert _is_transient(Exception("Error code: 529 - overloaded_error"))
+    assert _is_transient(Exception("Request timed out"))
+    assert not _is_transient(Exception("Error code: 401 - authentication_error"))
+    assert not _is_transient(Exception("not_found_error: model"))

@@ -97,3 +97,27 @@ def test_github_store_save_commits(tmp_path, monkeypatch):
     assert store._sha == "newsha"
     # Lokale Datei wurde mitgezogen.
     assert "Neu" in (tmp_path / "d.yaml").read_text()
+
+
+def test_github_store_retries_on_sha_conflict(tmp_path, monkeypatch):
+    calls = {"put": 0, "get": 0}
+
+    def fake_put(url, headers=None, json=None, timeout=None):
+        calls["put"] += 1
+        if calls["put"] == 1:
+            return _Resp(409, {})  # SHA-Konflikt beim ersten Versuch
+        return _Resp(200, {"content": {"sha": "fresh"}})
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        calls["get"] += 1
+        return _Resp(200, {"sha": "refetched"})
+
+    monkeypatch.setattr("app.storage.httpx.put", fake_put)
+    monkeypatch.setattr("app.storage.httpx.get", fake_get)
+
+    store = GitHubStore(_github_settings(tmp_path), str(tmp_path / "d.yaml"))
+    store._sha = "stale"
+    store.save("x: 1\n")
+    assert calls["put"] == 2          # erneuter Versuch nach Konflikt
+    assert calls["get"] == 1          # frische SHA geholt
+    assert store._sha == "fresh"

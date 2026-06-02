@@ -59,6 +59,13 @@ class Runtime:
         )
 
     def save_directory(self, directory: Directory) -> None:
-        """Speichert das Directory dauerhaft (Store) und übernimmt es sofort."""
-        self.store.save(directory_to_yaml(directory))
+        """Übernimmt das Directory sofort live und speichert es dauerhaft.
+
+        Reihenfolge: erst live anwenden (greift sofort, auch wenn die
+        Persistierung scheitert), dann in den Store schreiben. Wirft bei einem
+        Persistierungsfehler weiter – der Aufrufer kann das anzeigen.
+        Achtung: store.save kann blockieren (HTTP zu GitHub) – aus async-Kontext
+        via asyncio.to_thread aufrufen.
+        """
         self.apply_directory(directory)
+        self.store.save(directory_to_yaml(directory))

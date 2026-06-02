@@ -130,13 +130,15 @@ class CallAgent:
         self.fallback_model = settings.anthropic_fallback_model
 
     async def _create(self, *, system, messages, tools, tool_name: str):
-        """Ruft Claude auf; bei Überlastung/Fehler einmaliger Fallback auf ein
-        schnelleres Modell (z.B. Haiku), damit Anrufe robust bleiben."""
+        """Ruft Claude auf; nur bei *vorübergehenden* Fehlern (Überlastung/Timeout)
+        einmaliger Fallback auf ein schnelleres Modell. Bei klaren Fehlern
+        (z.B. ungültiger Key, Modell nicht gefunden) sofort abbrechen – kein
+        sinnloser zweiter Aufruf, der die Anruf-Latenz verdoppelt."""
         models = [self.model]
         if self.fallback_model and self.fallback_model != self.model:
             models.append(self.fallback_model)
         last_exc: Exception | None = None
-        for model in models:
+        for idx, model in enumerate(models):
             try:
                 return await self.client.messages.create(
                     model=model,
@@ -148,7 +150,10 @@ class CallAgent:
                 )
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
-                logger.warning("Claude-Aufruf mit Modell %s fehlgeschlagen: %s", model, exc)
+                is_last = idx == len(models) - 1
+                if is_last or not _is_transient(exc):
+                    raise
+                logger.warning("Claude-Modell %s überlastet/Timeout – Fallback: %s", model, exc)
         raise last_exc  # type: ignore[misc]
 
     def _messages(self, session: CallSession) -> list[dict]:
@@ -235,6 +240,16 @@ class CallAgent:
                 caller_request=transcript,
                 callback_number=session.caller_number,
             )
+
+
+def _is_transient(exc: Exception) -> bool:
+    """True bei vorübergehenden Fehlern, bei denen ein Fallback-Versuch sinnvoll ist."""
+    msg = str(exc).lower()
+    transient = ("overload", "529", "timeout", "timed out", "502", "503", "504", "connect")
+    permanent = ("not_found", "404", "authentication", "401", "permission", "invalid x-api-key", "400")
+    if any(p in msg for p in permanent):
+        return False
+    return any(t in msg for t in transient)
 
 
 def _extract_tool_input(response, tool_name: str) -> dict:
