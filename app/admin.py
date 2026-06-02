@@ -101,7 +101,7 @@ def create_admin_router(runtime: Runtime) -> APIRouter:
     async def admin_status(request: Request, _: bool = Depends(require_admin)) -> HTMLResponse:
         from app.diagnostics import run_checks
 
-        checks = await run_checks(settings)
+        checks = await run_checks(settings, runtime.directory)
         mail_msg = request.query_params.get("mail")
         return HTMLResponse(_render_status(checks, settings, mail_msg))
 

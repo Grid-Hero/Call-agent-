@@ -113,9 +113,42 @@ async def check_twilio(s: Settings) -> Check:
         return Check(name, "fail", str(exc)[:120])
 
 
-async def run_checks(s: Settings) -> list[Check]:
+def check_directory(directory) -> Check:
+    """Prüft, ob noch Demo-/Platzhalterdaten im Verzeichnis stehen."""
+    name = "Konfiguration (Abteilungen)"
+    problems = []
+    demo_emails = [
+        d.name for d in directory.departments if d.email.endswith("@example.com")
+    ]
+    if directory.fallback.email.endswith("@example.com"):
+        demo_emails.append(directory.fallback.department_name)
+    demo_phones = [
+        d.name
+        for d in directory.departments
+        if d.phone.startswith(("+49301111", "+49302222", "+49303333", "+49304444", "+49300000"))
+    ]
+    no_email = [d.name for d in directory.departments if not d.email]
+
+    if demo_emails:
+        problems.append("Demo-E-Mails (@example.com): " + ", ".join(demo_emails))
+    if demo_phones:
+        problems.append("Demo-Telefonnummern: " + ", ".join(demo_phones))
+    if no_email:
+        problems.append("ohne E-Mail: " + ", ".join(no_email))
+    if not directory.departments:
+        return Check(name, "fail", "keine Abteilungen angelegt")
+
+    if problems:
+        return Check(name, "warn", "; ".join(problems) + " – über /admin echte Daten eintragen")
+    return Check(name, "ok", f"{len(directory.departments)} Abteilungen, echte Daten")
+
+
+async def run_checks(s: Settings, directory=None) -> list[Check]:
     """Führt alle relevanten Checks parallel aus."""
-    checks = [check_claude(s), check_twilio(s), check_smtp(s)]
+    service_checks = [check_claude(s), check_twilio(s), check_smtp(s)]
     if s.tts_provider == "elevenlabs" or s.conversation_mode == "realtime":
-        checks.append(check_elevenlabs(s))
-    return list(await asyncio.gather(*checks))
+        service_checks.append(check_elevenlabs(s))
+    results = list(await asyncio.gather(*service_checks))
+    if directory is not None:
+        results.append(check_directory(directory))
+    return results

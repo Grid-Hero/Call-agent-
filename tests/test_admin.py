@@ -102,7 +102,7 @@ def test_status_requires_auth(tmp_path):
 def test_status_page_renders(tmp_path, monkeypatch):
     import app.diagnostics as diag
 
-    async def fake_run_checks(s):
+    async def fake_run_checks(s, directory=None):
         return [
             diag.Check("Claude (KI)", "ok", "Modell x"),
             diag.Check("E-Mail (SMTP)", "fail", "kein Host"),
