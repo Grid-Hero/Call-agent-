@@ -49,13 +49,12 @@ class TwilioAdapter(TelephonyAdapter):
         response.append(gather)
         return gather
 
-    @staticmethod
-    def _speak(container, text: str, language: str, audio_url: Optional[str]) -> None:
+    def _speak(self, container, text: str, language: str, audio_url: Optional[str]) -> None:
         """Spielt vorab erzeugtes Audio (z.B. ElevenLabs) ab oder spricht via Twilio."""
         if audio_url:
             container.play(audio_url)
         else:
-            container.say(text, language=language)
+            container.say(text, language=language, voice=self.settings.twilio_voice)
 
     def greeting_response(self, greeting_text, gather_action_url, language, audio_url=None):
         response = VoiceResponse()

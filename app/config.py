@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # "twilio"     -> eingebaute Twilio-Stimme (<Say>)
     # "elevenlabs" -> ElevenLabs-Stimme (<Play> mit synthetisiertem Audio)
     tts_provider: str = "twilio"
+    # Stimme für TTS_PROVIDER=twilio. Neuronale Amazon-Polly-Stimme klingt
+    # deutlich natürlicher als die Basis-Stimme (z.B. Polly.Vicki-Neural,
+    # Polly.Daniel-Neural). Kostet bei Twilio nichts extra.
+    twilio_voice: str = "Polly.Vicki-Neural"
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
     # Mehrsprachiges Modell (unterstützt Deutsch). Alternativen: eleven_turbo_v2_5 (geringere Latenz)

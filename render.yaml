@@ -29,6 +29,8 @@ services:
         value: twilio
       - key: TTS_PROVIDER
         value: twilio           # später "elevenlabs" für natürliche Stimme
+      - key: TWILIO_VOICE
+        value: Polly.Vicki-Neural   # neuronale deutsche Stimme (klingt natürlicher)
       - key: STT_PROVIDER
         value: elevenlabs       # Echtzeit-STT über ElevenLabs (kein Deepgram nötig)
       - key: ANTHROPIC_MODEL
