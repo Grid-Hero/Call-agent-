@@ -106,3 +106,54 @@ def load_directory(path: str) -> Directory:
 @lru_cache
 def get_directory(path: str) -> Directory:
     return load_directory(path)
+
+
+_WEEKDAYS = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
+
+
+def directory_to_dict(directory: Directory) -> dict:
+    """Wandelt ein Directory zurück in die YAML-Struktur (für Speichern/Anzeige)."""
+    bh = {"timezone": directory.business_hours.timezone}
+    for day in _WEEKDAYS:
+        bh[day] = list(getattr(directory.business_hours, day))
+    return {
+        "company": {
+            "name": directory.company_name,
+            "greeting": directory.greeting,
+            "business_hours": bh,
+        },
+        "departments": [
+            {
+                "id": d.id,
+                "name": d.name,
+                "topics": list(d.topics),
+                "email": d.email,
+                "phone": d.phone,
+                "transfer_enabled": d.transfer_enabled,
+            }
+            for d in directory.departments
+        ],
+        "fallback": {
+            "department_name": directory.fallback.department_name,
+            "email": directory.fallback.email,
+            "phone": directory.fallback.phone,
+            "transfer_enabled": directory.fallback.transfer_enabled,
+        },
+    }
+
+
+def save_directory(directory: Directory, path: str) -> None:
+    """Schreibt das Verzeichnis als YAML zurück und leert den Cache."""
+    data = directory_to_dict(directory)
+    Path(path).write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    get_directory.cache_clear()

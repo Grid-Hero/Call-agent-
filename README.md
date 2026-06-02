@@ -22,6 +22,9 @@ Telefonie ist über eine **austauschbare Adapter-Schicht** angebunden
 >
 > ☁️ **Online betreiben?** Deployment auf Render (aus dem GitHub-Repo, mit
 > sicherer Key-Eingabe) steht in **[docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md)**.
+>
+> ⚙️ **Im Browser konfigurieren?** Die Admin-Oberfläche unter `/admin`
+> (Abteilungen, Geschäftszeiten, Begrüßung) ist in **[docs/ADMIN.md](docs/ADMIN.md)** beschrieben.
 
 ---
 

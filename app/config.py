@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     # Verzeichnis
     directory_path: str = "config/directory.yaml"
 
+    # Admin-Weboberfläche (/admin). Ohne gesetztes Passwort ist sie deaktiviert.
+    admin_password: str = ""
+    admin_user: str = "admin"
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"

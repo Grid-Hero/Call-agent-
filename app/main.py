@@ -7,13 +7,10 @@ import logging
 from fastapi import FastAPI, Request, Response, WebSocket
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from app.ai.agent import CallAgent
+from app.admin import create_admin_router
 from app.config import get_settings
-from app.directory import get_directory
-from app.orchestrator import Orchestrator, SessionStore
+from app.runtime import Runtime
 from app.telephony.twilio_adapter import TwilioAdapter
-from app.tts.factory import build_tts
-from app.tts.store import AudioStore
 
 settings = get_settings()
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
@@ -21,22 +18,10 @@ logger = logging.getLogger("call-agent")
 
 app = FastAPI(title="Call-Agent", version="0.1.0")
 
-# --- Komponenten verdrahten --------------------------------------------------
-directory = get_directory(settings.directory_path)
-agent = CallAgent(settings, directory)
-
-if settings.telephony_provider == "twilio":
-    adapter = TwilioAdapter(settings)
-elif settings.telephony_provider == "asterisk":
-    from app.telephony.asterisk_adapter import AsteriskAdapter
-
-    adapter = AsteriskAdapter(settings)
-else:  # pragma: no cover
-    raise RuntimeError(f"Unbekannter TELEPHONY_PROVIDER: {settings.telephony_provider}")
-
-audio_store = AudioStore()
-tts = build_tts(settings, audio_store)
-orchestrator = Orchestrator(settings, directory, adapter, agent, SessionStore(), tts)
+# Zentraler Laufzeit-Container (Verzeichnis, Agent, Adapter, TTS, Orchestrator).
+# Über die Admin-Oberfläche (/admin) live neu ladbar.
+runtime = Runtime(settings)
+app.include_router(create_admin_router(runtime))
 
 _TWIML_MEDIA = "application/xml"
 
@@ -54,7 +39,7 @@ async def _validate_twilio(request: Request, form: dict) -> bool:
     möglich – dann wird sie (mit Warnung) übersprungen, statt den Anruf mit
     einem Fehler abzubrechen.
     """
-    if not isinstance(adapter, TwilioAdapter):
+    if not isinstance(runtime.adapter, TwilioAdapter):
         return True
     if not settings.twilio_validate_signature:
         return True
@@ -70,7 +55,7 @@ async def _validate_twilio(request: Request, form: dict) -> bool:
         str(request.url).replace("http://", "https://", 1),
     ]
     for url in candidates:
-        if adapter.validate_signature(url, form, signature):
+        if runtime.adapter.validate_signature(url, form, signature):
             return True
     logger.warning("Twilio-Signatur ungültig. Geprüfte URLs: %s", candidates)
     return False
@@ -83,8 +68,8 @@ async def health() -> JSONResponse:
         {
             "status": "ok",
             "provider": settings.telephony_provider,
-            "company": directory.company_name,
-            "departments": [d.id for d in directory.departments],
+            "company": runtime.directory.company_name,
+            "departments": [d.id for d in runtime.directory.departments],
         }
     )
 
@@ -97,12 +82,12 @@ async def voice_incoming(request: Request) -> Response:
         return PlainTextResponse("Ungültige Signatur", status_code=403)
 
     # Echtzeit-Modus: Anruf mit dem Media Stream (WebSocket) verbinden.
-    if settings.conversation_mode == "realtime" and isinstance(adapter, TwilioAdapter):
+    if settings.conversation_mode == "realtime" and isinstance(runtime.adapter, TwilioAdapter):
         caller = form.get("From", "")
         stream_url = f"{settings.websocket_base_url}/media"
-        return _twiml(adapter.realtime_connect_response(stream_url, caller))
+        return _twiml(runtime.adapter.realtime_connect_response(stream_url, caller))
 
-    return _twiml(await orchestrator.handle_incoming(form))
+    return _twiml(await runtime.orchestrator.handle_incoming(form))
 
 
 @app.post("/voice/handle")
@@ -111,7 +96,7 @@ async def voice_handle(request: Request) -> Response:
     form = dict(await request.form())
     if not await _validate_twilio(request, form):
         return PlainTextResponse("Ungültige Signatur", status_code=403)
-    return _twiml(await orchestrator.handle_speech(form))
+    return _twiml(await runtime.orchestrator.handle_speech(form))
 
 
 @app.get("/audio/{token}.mp3")
@@ -120,7 +105,7 @@ async def serve_audio(token: str) -> Response:
 
     Twilio ruft diese URL über <Play> ab. Tokens sind zufällig und kurzlebig.
     """
-    item = audio_store.get(token)
+    item = runtime.audio_store.get(token)
     if item is None:
         return PlainTextResponse("Nicht gefunden oder abgelaufen", status_code=404)
     data, content_type = item
@@ -133,7 +118,7 @@ async def voice_after_transfer(request: Request) -> Response:
     form = dict(await request.form())
     if not await _validate_twilio(request, form):
         return PlainTextResponse("Ungültige Signatur", status_code=403)
-    return _twiml(await orchestrator.handle_after_transfer(form))
+    return _twiml(await runtime.orchestrator.handle_after_transfer(form))
 
 
 @app.websocket("/media")
@@ -147,8 +132,8 @@ async def media_stream(websocket: WebSocket) -> None:
     transport = TwilioWebSocketTransport(websocket)
     realtime = RealtimeCallSession(
         settings,
-        directory,
-        agent,
+        runtime.directory,
+        runtime.agent,
         transport,
         build_stt(settings),
         build_streaming_tts(settings),

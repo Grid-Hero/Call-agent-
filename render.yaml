@@ -63,6 +63,9 @@ services:
         sync: false
       - key: EMAIL_FALLBACK_TO
         sync: false
+      # Passwort für die Konfig-Weboberfläche /admin (frei wählbar):
+      - key: ADMIN_PASSWORD
+        sync: false
 
       # --- Optional (nur falls genutzt) -------------------------------
       # Für ElevenLabs-Stimme UND Echtzeit-STT genügt EIN ElevenLabs-Account:
