@@ -91,8 +91,13 @@ class Directory(BaseModel):
 
 
 def load_directory(path: str) -> Directory:
-    """Lädt und validiert die YAML-Verzeichnisdatei."""
-    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    """Lädt und validiert die YAML-Verzeichnisdatei von einem Pfad."""
+    return parse_directory_yaml(Path(path).read_text(encoding="utf-8"))
+
+
+def parse_directory_yaml(text: str) -> Directory:
+    """Parst YAML-Text zu einem Directory."""
+    raw = yaml.safe_load(text)
     company = raw.get("company", {})
     return Directory(
         company_name=company.get("name", "Unternehmen"),
@@ -150,10 +155,14 @@ def directory_to_dict(directory: Directory) -> dict:
     }
 
 
-def save_directory(directory: Directory, path: str) -> None:
-    """Schreibt das Verzeichnis als YAML zurück und leert den Cache."""
-    data = directory_to_dict(directory)
-    Path(path).write_text(
-        yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+def directory_to_yaml(directory: Directory) -> str:
+    """Serialisiert ein Directory als YAML-Text."""
+    return yaml.safe_dump(
+        directory_to_dict(directory), allow_unicode=True, sort_keys=False
     )
+
+
+def save_directory(directory: Directory, path: str) -> None:
+    """Schreibt das Verzeichnis als YAML in eine Datei und leert den Cache."""
+    Path(path).write_text(directory_to_yaml(directory), encoding="utf-8")
     get_directory.cache_clear()

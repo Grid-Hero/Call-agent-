@@ -25,23 +25,36 @@ bequem im Browser pflegen.
 Nach **Speichern** werden die Änderungen **sofort live** übernommen – kein
 Neustart nötig.
 
-## ⚠️ Wichtig: Persistenz auf Render
+## ⭐ Dauerhafte Speicherung in GitHub (empfohlen)
 
-Auf dem **Free-Plan** ist das Dateisystem **flüchtig**: Änderungen über `/admin`
-gelten sofort und bleiben, bis die Instanz neu startet oder neu deployed wird –
-**danach sind sie zurückgesetzt** auf den Stand aus dem Git-Repo.
+Standardmäßig schreibt `/admin` in die lokale Datei – auf dem **Render Free-Plan**
+ist die aber flüchtig (Änderungen gehen bei Neustart/Deploy verloren).
 
-Damit Änderungen dauerhaft bleiben, hast du zwei Optionen:
+Mit der **GitHub-Speicherung** werden Änderungen stattdessen **als Commit ins
+Repo** geschrieben und beim Start von dort geladen: dauerhaft **und** versioniert.
 
-1. **Persistente Disk (empfohlen, ab Starter-Plan):**
-   - In Render eine **Disk** anlegen, z.B. gemountet unter `/data`
-   - Umgebungsvariable `DIRECTORY_PATH=/data/directory.yaml` setzen
-   - Beim ersten Start einmal die Startwerte dorthin kopieren (oder über `/admin`
-     neu eingeben). Ab dann überleben Änderungen Neustarts/Deploys.
+**Einrichten:**
+1. **GitHub-Token erstellen:** GitHub → *Settings* → *Developer settings* →
+   *Fine-grained tokens* → *Generate new token*
+   - **Repository access:** nur `Grid-Hero/Call-agent-`
+   - **Permissions:** *Contents* → **Read and write**
+   - Token kopieren (beginnt mit `github_pat_…`)
+2. **In Render → Environment** setzen:
+   - `GITHUB_TOKEN` = dein Token
+   - `GITHUB_REPO` = `Grid-Hero/Call-agent-`
+   - `GITHUB_BRANCH` = der **tatsächlich deployte Branch**
+   - (optional `GITHUB_CONFIG_PATH`, Standard: `config/directory.yaml`)
+3. Speichern → ab jetzt landet jede `/admin`-Änderung als Commit im Repo.
 
-2. **Im Repo pflegen:** Änderungen direkt in `config/directory.yaml` committen
-   (per Git). Dann sind sie versioniert und nach jedem Deploy aktiv – aber eben
-   nicht über die Weboberfläche dauerhaft.
+Die Admin-Seite zeigt oben an, ob „Speicherung: GitHub" aktiv ist.
 
-> Für den dauerhaften Produktivbetrieb ist Option 1 (persistente Disk) am
-> komfortabelsten: `/admin` bleibt nutzbar **und** Änderungen sind dauerhaft.
+> **Hinweis:** Ist in Render **Auto-Deploy** aktiv, löst jeder Speichern-Commit
+> einen kurzen Re-Deploy aus (die Änderung ist durch das sofortige Live-Update
+> aber bereits aktiv). Wer das vermeiden will, nutzt einen separaten
+> Konfig-Branch oder schaltet Auto-Deploy ab.
+
+## Alternative: Persistente Disk
+
+Statt GitHub geht auch eine **persistente Disk** (ab Starter-Plan): Disk z.B.
+unter `/data` mounten und `DIRECTORY_PATH=/data/directory.yaml` setzen. Dann
+überleben Änderungen ebenfalls Neustarts – ohne GitHub-Token.

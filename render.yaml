@@ -66,6 +66,14 @@ services:
       # Passwort für die Konfig-Weboberfläche /admin (frei wählbar):
       - key: ADMIN_PASSWORD
         sync: false
+      # Dauerhafte Speicherung der /admin-Änderungen direkt im GitHub-Repo
+      # (überlebt Neustarts auf dem Free-Plan, versioniert als Commit):
+      - key: GITHUB_REPO
+        value: Grid-Hero/Call-agent-
+      - key: GITHUB_BRANCH
+        value: main          # auf den tatsächlich deployten Branch setzen!
+      - key: GITHUB_TOKEN
+        sync: false           # Fine-grained PAT mit Contents read/write
 
       # --- Optional (nur falls genutzt) -------------------------------
       # Für ElevenLabs-Stimme UND Echtzeit-STT genügt EIN ElevenLabs-Account:

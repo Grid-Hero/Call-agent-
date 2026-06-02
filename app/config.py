@@ -80,6 +80,14 @@ class Settings(BaseSettings):
     # Verzeichnis
     directory_path: str = "config/directory.yaml"
 
+    # Persistente Speicherung der Konfiguration in GitHub (optional).
+    # Wenn Token + Repo gesetzt sind, schreibt /admin Änderungen als Commit
+    # ins Repo und lädt beim Start von dort (überlebt Render-Neustarts).
+    github_token: str = ""
+    github_repo: str = ""          # Format: "owner/repo", z.B. "Grid-Hero/Call-agent-"
+    github_branch: str = "main"
+    github_config_path: str = "config/directory.yaml"
+
     # Admin-Weboberfläche (/admin). Ohne gesetztes Passwort ist sie deaktiviert.
     admin_password: str = ""
     admin_user: str = "admin"

@@ -19,7 +19,6 @@ from app.directory import (
     Department,
     Directory,
     Fallback,
-    save_directory,
 )
 from app.runtime import Runtime
 
@@ -79,15 +78,23 @@ def create_admin_router(runtime: Runtime) -> APIRouter:
 
     @router.get("", response_class=HTMLResponse)
     async def admin_page(request: Request, _: bool = Depends(require_admin)) -> HTMLResponse:
+        from app.storage import GitHubStore
+
         saved = request.query_params.get("saved") == "1"
-        return HTMLResponse(_render_page(runtime.directory, saved))
+        if isinstance(runtime.store, GitHubStore):
+            storage_note = "💾 Speicherung: <b>GitHub</b> – Änderungen sind dauerhaft (als Commit)."
+        else:
+            storage_note = (
+                "⚠️ Speicherung: <b>lokal</b> – auf Render Free gehen Änderungen bei "
+                "Neustart verloren. Für dauerhaftes Speichern GitHub einrichten (siehe docs/ADMIN.md)."
+            )
+        return HTMLResponse(_render_page(runtime.directory, saved, storage_note))
 
     @router.post("")
     async def admin_save(request: Request, _: bool = Depends(require_admin)) -> RedirectResponse:
         form = await request.form()
         directory = _parse_form(form)
-        save_directory(directory, settings.directory_path)
-        runtime.reload()
+        runtime.save_directory(directory)
         return RedirectResponse(url="/admin?saved=1", status_code=status.HTTP_303_SEE_OTHER)
 
     return router
@@ -163,7 +170,7 @@ def _dept_row(i, d: Department | None = None) -> str:
     """
 
 
-def _render_page(directory: Directory, saved: bool) -> str:
+def _render_page(directory: Directory, saved: bool, storage_note: str = "") -> str:
     bh = directory.business_hours
     days_html = ""
     for key, label in _WEEKDAYS:
@@ -209,6 +216,7 @@ def _render_page(directory: Directory, saved: bool) -> str:
 </style></head>
 <body>
   <h1>📞 Call-Agent – Konfiguration</h1>
+  <p class="hint">{storage_note}</p>
   {banner}
   <form method="post" action="/admin">
     <fieldset>

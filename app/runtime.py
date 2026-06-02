@@ -1,8 +1,9 @@
 """Zentraler Laufzeit-Container: bündelt die verdrahteten Komponenten.
 
 Ermöglicht ein Live-Neuladen der Konfiguration (z.B. nach Änderungen über die
-Admin-Oberfläche), ohne den Prozess neu zu starten: ``reload()`` baut Agent,
-Adapter, TTS und Orchestrator anhand der aktuellen ``directory.yaml`` neu auf.
+Admin-Oberfläche), ohne den Prozess neu zu starten: ``apply_directory()`` baut
+Agent, Adapter, TTS und Orchestrator neu auf. Die Konfiguration wird über einen
+``DirectoryStore`` geladen/gespeichert (lokale Datei oder GitHub).
 """
 
 from __future__ import annotations
@@ -11,8 +12,9 @@ import logging
 
 from app.ai.agent import CallAgent
 from app.config import Settings
-from app.directory import load_directory
+from app.directory import Directory, directory_to_yaml, parse_directory_yaml
 from app.orchestrator import Orchestrator, SessionStore
+from app.storage import build_store
 from app.telephony.twilio_adapter import TwilioAdapter
 from app.tts.factory import build_tts
 from app.tts.store import AudioStore
@@ -25,6 +27,7 @@ class Runtime:
         self.settings = settings
         self.audio_store = AudioStore()
         self.session_store = SessionStore()
+        self.store = build_store(settings)
         self.reload()
 
     def _build_adapter(self):
@@ -37,8 +40,12 @@ class Runtime:
         raise RuntimeError(f"Unbekannter TELEPHONY_PROVIDER: {self.settings.telephony_provider}")
 
     def reload(self) -> None:
-        """Lädt die Verzeichnis-Konfiguration neu und baut die Komponenten auf."""
-        self.directory = load_directory(self.settings.directory_path)
+        """Lädt die Konfiguration aus dem Store und baut die Komponenten neu auf."""
+        self.apply_directory(parse_directory_yaml(self.store.load()))
+
+    def apply_directory(self, directory: Directory) -> None:
+        """Übernimmt ein Directory live (ohne erneutes Laden aus dem Store)."""
+        self.directory = directory
         self.agent = CallAgent(self.settings, self.directory)
         self.adapter = self._build_adapter()
         self.tts = build_tts(self.settings, self.audio_store)
@@ -50,3 +57,8 @@ class Runtime:
             "Runtime geladen: %s (%d Abteilungen)",
             self.directory.company_name, len(self.directory.departments),
         )
+
+    def save_directory(self, directory: Directory) -> None:
+        """Speichert das Directory dauerhaft (Store) und übernimmt es sofort."""
+        self.store.save(directory_to_yaml(directory))
+        self.apply_directory(directory)
