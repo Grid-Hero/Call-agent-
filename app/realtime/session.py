@@ -40,6 +40,7 @@ class RealtimeCallSession:
         stt: StreamingSTT,
         tts: StreamingTTS,
         call_control: CallControl,
+        call_log=None,
     ):
         self.settings = settings
         self.directory = directory
@@ -48,6 +49,7 @@ class RealtimeCallSession:
         self.stt = stt
         self.tts = tts
         self.call_control = call_control
+        self.call_log = call_log
 
         self.call_sid: str = ""
         self.session: Optional[CallSession] = None
@@ -178,7 +180,8 @@ class RealtimeCallSession:
                 self.session.transferred = True
                 await self.call_control.transfer(self.call_sid, phone)
                 await finish_with_message(
-                    self.agent, self.directory, self.settings, self.session, transferred_note=True
+                    self.agent, self.directory, self.settings, self.session,
+                    transferred_note=True, call_log=self.call_log,
                 )
                 self._done.set()
                 return
@@ -202,6 +205,8 @@ class RealtimeCallSession:
 
     async def _finalize_and_hangup(self) -> None:
         assert self.session is not None
-        await finish_with_message(self.agent, self.directory, self.settings, self.session)
+        await finish_with_message(
+            self.agent, self.directory, self.settings, self.session, call_log=self.call_log
+        )
         await self.call_control.hangup(self.call_sid)
         self._done.set()

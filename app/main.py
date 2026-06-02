@@ -138,6 +138,7 @@ async def media_stream(websocket: WebSocket) -> None:
         build_stt(settings),
         build_streaming_tts(settings),
         build_call_control(settings),
+        runtime.call_log,
     )
     try:
         await realtime.run()

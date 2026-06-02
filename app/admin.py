@@ -133,6 +133,10 @@ def create_admin_router(runtime: Runtime) -> APIRouter:
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
+    @router.get("/calls", response_class=HTMLResponse)
+    async def admin_calls(request: Request, _: bool = Depends(require_admin)) -> HTMLResponse:
+        return HTMLResponse(_render_calls(runtime.call_log.recent()))
+
     return router
 
 
@@ -255,7 +259,7 @@ def _render_page(directory: Directory, saved: bool, storage_note: str = "", err:
 </style></head>
 <body>
   <h1>📞 Call-Agent – Konfiguration</h1>
-  <p><a href="/admin/status">🔎 Selbsttest & Status öffnen</a></p>
+  <p><a href="/admin/status">🔎 Selbsttest & Status</a> &nbsp;·&nbsp; <a href="/admin/calls">📋 Anruf-Protokoll</a></p>
   <p class="hint">{storage_note}</p>
   {banner}
   <form method="post" action="/admin">
@@ -364,4 +368,47 @@ def _render_status(checks, settings, mail_msg: str | None) -> str:
   </fieldset>
 
   <p><a href="/admin/status">🔄 Status neu prüfen</a></p>
+</body></html>"""
+
+
+def _render_calls(records) -> str:
+    """Rendert die letzten Anrufe/Zusammenfassungen."""
+    if records:
+        rows = ""
+        for r in records:
+            when = r.time.strftime("%d.%m. %H:%M")
+            mail = "📧" if r.emailed else "—"
+            transferred = "↪️ durchgestellt" if r.transferred else ""
+            urgency = {"hoch": "🔴", "normal": "", "niedrig": ""}.get(r.urgency, "")
+            rows += f"""
+            <div class="call">
+              <div class="meta">{when} · <b>{_esc(r.department)}</b> · {_esc(r.caller)} {urgency} {transferred} · Mail: {mail}</div>
+              <div class="subj">{_esc(r.subject)}</div>
+              <div class="body">{_esc(r.summary)}</div>
+              <div class="req"><b>Anliegen:</b> {_esc(r.request)}</div>
+            </div>"""
+        body = rows
+    else:
+        body = '<p class="hint">Noch keine Anrufe protokolliert. Nach dem nächsten Anruf erscheint hier die Zusammenfassung.</p>'
+
+    return f"""<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call-Agent – Anruf-Protokoll</title>
+<style>
+  body {{ font-family: system-ui, sans-serif; max-width: 820px; margin: 0 auto; padding: 24px; color:#1a1a1a; background:#f7f7f8; }}
+  h1 {{ font-size: 1.4rem; }}
+  .call {{ background:#fff; border:1px solid #e3e3e3; border-radius:10px; padding:14px 16px; margin-bottom:12px; }}
+  .meta {{ color:#666; font-size:.82rem; margin-bottom:6px; }}
+  .subj {{ font-weight:600; margin-bottom:4px; }}
+  .body {{ margin-bottom:6px; }}
+  .req {{ font-size:.9rem; color:#333; }}
+  .hint {{ color:#666; }}
+  a {{ color:#2d6cdf; }}
+</style></head>
+<body>
+  <h1>📋 Anruf-Protokoll <span style="font-size:.8rem;color:#888">(letzte {len(records)})</span></h1>
+  <p><a href="/admin">← zurück</a> &nbsp;·&nbsp; <a href="/admin/calls">🔄 aktualisieren</a></p>
+  {body}
+  <p class="hint">Hinweis: flüchtige Liste (im Speicher). Überlebt keinen Neustart.</p>
 </body></html>"""

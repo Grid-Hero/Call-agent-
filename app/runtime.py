@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 
 from app.ai.agent import CallAgent
+from app.call_log import CallLog
 from app.config import Settings
 from app.directory import Directory, directory_to_yaml, parse_directory_yaml
 from app.orchestrator import Orchestrator, SessionStore
@@ -27,6 +28,7 @@ class Runtime:
         self.settings = settings
         self.audio_store = AudioStore()
         self.session_store = SessionStore()
+        self.call_log = CallLog()
         self.store = build_store(settings)
         self.reload()
 
@@ -51,7 +53,7 @@ class Runtime:
         self.tts = build_tts(self.settings, self.audio_store)
         self.orchestrator = Orchestrator(
             self.settings, self.directory, self.adapter, self.agent,
-            self.session_store, self.tts,
+            self.session_store, self.tts, self.call_log,
         )
         logger.info(
             "Runtime geladen: %s (%d Abteilungen)",

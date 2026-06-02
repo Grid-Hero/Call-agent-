@@ -23,8 +23,9 @@ async def finish_with_message(
     settings: Settings,
     session: CallSession,
     transferred_note: bool = False,
+    call_log=None,
 ) -> None:
-    """Erzeugt die Zusammenfassung und sendet sie an die zuständige Abteilung."""
+    """Erzeugt die Zusammenfassung, protokolliert sie und sendet sie per E-Mail."""
     summary = await agent.summarize(session)
     _name, email, _phone, _ = directory.routing_target(session.department_id)
     # Demo-/Platzhalter-Adressen (@example.com) nicht verwenden – dann lieber an
@@ -34,4 +35,7 @@ async def finish_with_message(
         to_addr = settings.email_fallback_to
     if transferred_note:
         summary.subject = f"[durchgestellt] {summary.subject}"
-    await send_summary(summary, session, settings, to_addr)
+    emailed = await send_summary(summary, session, settings, to_addr)
+    # Immer protokollieren – auch wenn die E-Mail (noch) nicht zugestellt wurde.
+    if call_log is not None:
+        call_log.add(summary, session, emailed)

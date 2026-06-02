@@ -171,3 +171,27 @@ async def test_finalize_routes_demo_email_to_fallback(tmp_path, monkeypatch):
     await fin.finish_with_message(_Agent(), directory, s, sess)
     # vertrieb hat @example.com -> echte Fallback-Adresse wird verwendet
     assert captured["to"] == "echt@planetingreen.de"
+
+
+def test_call_log_records_and_renders(tmp_path):
+    from app.call_log import CallLog
+    from app.models import CallSession, CallSummary
+
+    log = CallLog()
+    summ = CallSummary(
+        caller_number="+4915100", department_id="vertrieb", department_name="Vertrieb",
+        subject="Angebot", summary="Kunde will Angebot", caller_request="Bitte Angebot zusenden",
+        urgency="hoch",
+    )
+    sess = CallSession(call_sid="C1", caller_number="+4915100")
+    log.add(summ, sess, emailed=True)
+    recent = log.recent()
+    assert len(recent) == 1 and recent[0].subject == "Angebot"
+
+
+def test_calls_page_requires_auth_and_renders(tmp_path):
+    client, rt = _client(_settings(tmp_path, password="geheim"))
+    assert client.get("/admin/calls").status_code == 401
+    r = client.get("/admin/calls", auth=("admin", "geheim"))
+    assert r.status_code == 200
+    assert "Anruf-Protokoll" in r.text

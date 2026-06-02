@@ -52,6 +52,7 @@ class Orchestrator:
         agent: CallAgent,
         store: SessionStore | None = None,
         tts: TTSProvider | None = None,
+        call_log=None,
     ):
         self.settings = settings
         self.directory = directory
@@ -59,6 +60,7 @@ class Orchestrator:
         self.agent = agent
         self.store = store or SessionStore()
         self.tts = tts or NullTTS()
+        self.call_log = call_log
         self._bg_tasks: set = set()
 
     # --- URLs für Webhook-Callbacks -----------------------------------------
@@ -173,5 +175,8 @@ class Orchestrator:
         """
         self.store.pop(session.call_sid)
         self._run_bg(
-            finish_with_message(self.agent, self.directory, self.settings, session, transferred_note)
+            finish_with_message(
+                self.agent, self.directory, self.settings, session,
+                transferred_note, self.call_log,
+            )
         )
