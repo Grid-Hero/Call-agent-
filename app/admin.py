@@ -97,6 +97,29 @@ def create_admin_router(runtime: Runtime) -> APIRouter:
         runtime.save_directory(directory)
         return RedirectResponse(url="/admin?saved=1", status_code=status.HTTP_303_SEE_OTHER)
 
+    @router.get("/status", response_class=HTMLResponse)
+    async def admin_status(request: Request, _: bool = Depends(require_admin)) -> HTMLResponse:
+        from app.diagnostics import run_checks
+
+        checks = await run_checks(settings)
+        mail_msg = request.query_params.get("mail")
+        return HTMLResponse(_render_status(checks, settings, mail_msg))
+
+    @router.post("/test-email")
+    async def admin_test_email(request: Request, _: bool = Depends(require_admin)) -> RedirectResponse:
+        from urllib.parse import quote
+
+        from app.notify.email import send_test_email
+
+        form = await request.form()
+        to_addr = (form.get("to") or settings.email_fallback_to or "").strip()
+        ok, msg = await send_test_email(settings, to_addr)
+        prefix = "✅ " if ok else "❌ "
+        return RedirectResponse(
+            url=f"/admin/status?mail={quote(prefix + msg)}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
     return router
 
 
@@ -216,6 +239,7 @@ def _render_page(directory: Directory, saved: bool, storage_note: str = "") -> s
 </style></head>
 <body>
   <h1>📞 Call-Agent – Konfiguration</h1>
+  <p><a href="/admin/status">🔎 Selbsttest & Status öffnen</a></p>
   <p class="hint">{storage_note}</p>
   {banner}
   <form method="post" action="/admin">
@@ -266,4 +290,62 @@ def _render_page(directory: Directory, saved: bool, storage_note: str = "") -> s
       c.value = i + 1;
     }}
   </script>
+</body></html>"""
+
+
+def _render_status(checks, settings, mail_msg: str | None) -> str:
+    """Rendert das Selbsttest-Dashboard mit Live-Status der Dienste."""
+    icons = {"ok": "✅", "warn": "⚠️", "fail": "❌"}
+    rows = ""
+    for c in checks:
+        rows += (
+            f'<tr><td>{icons.get(c.status, "•")}</td>'
+            f"<td><b>{_esc(c.name)}</b></td>"
+            f"<td>{_esc(c.detail)}</td></tr>"
+        )
+
+    all_ok = all(c.status == "ok" for c in checks)
+    summary = (
+        '<div class="ok">🎉 Alle geprüften Dienste laufen!</div>'
+        if all_ok
+        else '<div class="hint">Behebe die mit ❌ markierten Punkte. ⚠️ = vorübergehend/Hinweis.</div>'
+    )
+    mail_banner = f'<div class="ok">{_esc(mail_msg)}</div>' if mail_msg else ""
+    to_default = _esc(settings.email_fallback_to)
+
+    return f"""<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call-Agent – Selbsttest</title>
+<style>
+  body {{ font-family: system-ui, sans-serif; max-width: 760px; margin: 0 auto; padding: 24px; color:#1a1a1a; background:#f7f7f8; }}
+  h1 {{ font-size: 1.4rem; }}
+  table {{ width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; }}
+  td {{ padding:12px 10px; border-bottom:1px solid #eee; vertical-align:top; }}
+  td:first-child {{ width:34px; font-size:1.1rem; text-align:center; }}
+  fieldset {{ border:1px solid #ddd; border-radius:10px; padding:16px; margin:18px 0; background:#fff; }}
+  legend {{ font-weight:600; padding:0 6px; }}
+  input {{ padding:8px; border:1px solid #ccc; border-radius:7px; font-size:.95rem; }}
+  button {{ background:#2d6cdf; color:#fff; border:0; padding:10px 16px; border-radius:8px; font-size:1rem; cursor:pointer; }}
+  .ok {{ background:#e6f7ec; border:1px solid #93d6ab; padding:10px 14px; border-radius:8px; margin:14px 0; }}
+  .hint {{ color:#666; font-size:.85rem; margin:14px 0; }}
+  a {{ color:#2d6cdf; }}
+</style></head>
+<body>
+  <h1>🔎 Selbsttest & Status</h1>
+  <p><a href="/admin">← zurück zur Konfiguration</a></p>
+  {mail_banner}
+  {summary}
+  <table>{rows}</table>
+
+  <fieldset>
+    <legend>📧 Test-E-Mail senden</legend>
+    <p class="hint">Sendet eine Test-Mail über die aktuelle SMTP-Konfiguration – ohne Anruf.</p>
+    <form method="post" action="/admin/test-email">
+      <input name="to" type="email" value="{to_default}" placeholder="empfaenger@firma.de" size="32">
+      <button type="submit">Test-E-Mail senden</button>
+    </form>
+  </fieldset>
+
+  <p><a href="/admin/status">🔄 Status neu prüfen</a></p>
 </body></html>"""

@@ -92,3 +92,41 @@ def test_admin_save_updates_directory(tmp_path):
     assert dept.email == "vertrieb@planet-in-green.de"
     assert dept.transfer_enabled is True
     assert rt.directory.business_hours.monday == ["08:00", "17:00"]
+
+
+def test_status_requires_auth(tmp_path):
+    client, _ = _client(_settings(tmp_path, password="geheim"))
+    assert client.get("/admin/status").status_code == 401
+
+
+def test_status_page_renders(tmp_path, monkeypatch):
+    import app.diagnostics as diag
+
+    async def fake_run_checks(s):
+        return [
+            diag.Check("Claude (KI)", "ok", "Modell x"),
+            diag.Check("E-Mail (SMTP)", "fail", "kein Host"),
+        ]
+
+    monkeypatch.setattr(diag, "run_checks", fake_run_checks)
+    client, _ = _client(_settings(tmp_path, password="geheim"))
+    r = client.get("/admin/status", auth=("admin", "geheim"))
+    assert r.status_code == 200
+    assert "Selbsttest" in r.text
+    assert "Claude (KI)" in r.text
+
+
+def test_test_email_requires_auth(tmp_path):
+    client, _ = _client(_settings(tmp_path, password="geheim"))
+    assert client.post("/admin/test-email", data={"to": "x@y.de"}).status_code == 401
+
+
+def test_test_email_without_smtp_reports_failure(tmp_path):
+    # _settings hat keinen SMTP_HOST -> Test-Mail schlägt sofort (ohne Netzwerk) fehl
+    client, _ = _client(_settings(tmp_path, password="geheim"))
+    r = client.post(
+        "/admin/test-email", auth=("admin", "geheim"),
+        data={"to": "x@y.de"}, follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert "/admin/status" in r.headers["location"]

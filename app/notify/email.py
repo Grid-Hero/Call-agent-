@@ -80,3 +80,38 @@ async def send_summary(
     except Exception:  # pragma: no cover - Netzwerk/Server
         logger.exception("E-Mail-Versand an %s fehlgeschlagen", to_addr)
         return False
+
+
+async def send_test_email(settings: Settings, to_addr: str) -> tuple[bool, str]:
+    """Versendet eine Test-E-Mail und gibt (Erfolg, Meldung) zurück.
+
+    Für den Selbsttest in der Admin-Oberfläche, um die Mail-Konfiguration ohne
+    echten Anruf zu prüfen.
+    """
+    if not settings.smtp_host:
+        return False, "Kein SMTP_HOST konfiguriert."
+    if not to_addr:
+        return False, "Keine Empfängeradresse (EMAIL_FALLBACK_TO) gesetzt."
+
+    msg = EmailMessage()
+    msg["Subject"] = "Call-Agent – Test-E-Mail ✅"
+    msg["From"] = settings.email_from
+    msg["To"] = to_addr
+    msg.set_content(
+        "Dies ist eine Test-E-Mail vom Call-Agent.\n\n"
+        "Wenn du das liest, funktioniert der E-Mail-Versand korrekt. 🎉"
+    )
+    try:
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_username or None,
+            password=settings.smtp_password or None,
+            start_tls=settings.smtp_use_tls,
+            timeout=20,
+        )
+        return True, f"Test-E-Mail an {to_addr} gesendet."
+    except Exception as exc:  # noqa: BLE001 - dem Nutzer den Grund zeigen
+        logger.exception("Test-E-Mail an %s fehlgeschlagen", to_addr)
+        return False, f"Fehlgeschlagen: {str(exc)[:200]}"
