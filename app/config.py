@@ -33,9 +33,10 @@ class Settings(BaseSettings):
 
     # Anthropic / Claude
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-6"
-    # Ausweichmodell bei Überlastung (529) des Hauptmodells – schnell & robust.
-    anthropic_fallback_model: str = "claude-haiku-4-5-20251001"
+    # Für Telefon-Agenten ist Haiku ideal: schnell, selten überlastet, günstig.
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+    # Ausweichmodell, falls das Hauptmodell überlastet ist (529).
+    anthropic_fallback_model: str = "claude-sonnet-4-6"
     agent_language: str = "de-DE"
     agent_company_name: str = "Musterfirma GmbH"
 

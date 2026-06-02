@@ -121,8 +121,11 @@ class CallAgent:
     def __init__(self, settings: Settings, directory: Directory):
         self.settings = settings
         self.directory = directory
-        # Timeout begrenzen, damit ein Aufruf das Twilio-Webhook-Budget nicht sprengt.
-        self.client = AsyncAnthropic(api_key=settings.anthropic_api_key, timeout=12.0)
+        # max_retries=0: keine langsamen SDK-Wiederholungen; bei Überlastung
+        # sofort das Fallback-Modell probieren (geringe Latenz im Anruf).
+        self.client = AsyncAnthropic(
+            api_key=settings.anthropic_api_key, timeout=12.0, max_retries=0
+        )
         self.model = settings.anthropic_model
         self.fallback_model = settings.anthropic_fallback_model
 
